@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>claude-browser</title>
+    <style>
+      body {
+        font: 13px -apple-system, system-ui, sans-serif;
+        margin: 0;
+        padding: 12px 14px;
+        width: 200px;
+        color: #1f2937;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ef4444;
+        flex: none;
+      }
+      h1 {
+        font-size: 12px;
+        margin: 0 0 8px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>claude-browser</h1>
+    <div class="row">
+      <span id="dot"></span>
+      <span id="label">Disconnected</span>
+    </div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
