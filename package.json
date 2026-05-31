@@ -1,7 +1,7 @@
 {
   "name": "claude-browser",
-  "version": "0.1.0",
   "private": true,
+  "version": "0.1.0",
   "description": "Codex-style stable browser control for Claude Code",
   "type": "module",
   "engines": {
@@ -12,15 +12,23 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
+    "test": "vitest run",
+    "test:integration": "RUN_BROWSER_TESTS=1 vitest run --config vitest.integration.config.ts",
+    "lint": "tsc -b --pretty",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "clean": "rm -rf packages/*/dist"
+    "clean": "rm -rf packages/*/dist",
+    "install:browser": "tsx scripts/install.ts",
+    "uninstall:browser": "tsx scripts/uninstall.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "chrome-launcher": "^1.1.2",
+    "tslib": "^2.8.1",
     "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "ws": "^8.18.0"
   }
 }
