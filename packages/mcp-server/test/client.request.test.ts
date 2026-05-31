@@ -23,7 +23,7 @@ class FakeSocket implements ClientSocket {
     this.emit('message', Buffer.from(JSON.stringify(msg)));
   }
   lastSent(): JsonRpcMessage {
-    return JSON.parse(this.sent[this.sent.length - 1]);
+    return JSON.parse(this.sent[this.sent.length - 1]!);
   }
 }
 
@@ -43,7 +43,7 @@ function connectedClient() {
 describe('BrokerClient handshake', () => {
   it('sends AgentHello as the first message on open', () => {
     const { socket } = connectedClient();
-    expect(JSON.parse(socket.sent[0])).toEqual({
+    expect(JSON.parse(socket.sent[0]!)).toEqual({
       type: 'hello',
       role: 'agent',
       token: 'tok',
