@@ -9,6 +9,15 @@ import { registerAll } from './tools/index.js';
 // R4: re-export BrokerClient for M5 harness
 export { BrokerClient };
 
+/**
+ * Narrow interface covering the only McpServer surface that registerAll uses.
+ * Accepting this instead of the full McpServer class lets test harnesses pass a
+ * minimal capture-sink without a double-escape cast (as unknown as McpServer).
+ */
+export interface McpToolRegistrar {
+  registerTool(name: string, config: unknown, handler: (...args: never[]) => unknown): void;
+}
+
 /** R4: Factor the context-builder out of main() so M5 harness can reuse it. */
 export function makeToolContext(client: BrokerClient): ReturnType<typeof createContext> {
   return createContext(client);
@@ -29,9 +38,11 @@ export async function createClient(opts: {
   return client;
 }
 
-/** R4: Thin wrapper — register all tools on an McpServer using a pre-built client. */
-export function registerTools(server: McpServer, client: BrokerClient): void {
-  registerAll(server, makeToolContext(client));
+/** R4: Thin wrapper — register all tools on an McpServer using a pre-built client.
+ *  Accepts McpToolRegistrar so test harnesses can pass a capture-sink directly,
+ *  without a double-escape cast. McpServer satisfies this interface. */
+export function registerTools(server: McpToolRegistrar, client: BrokerClient): void {
+  registerAll(server as McpServer, makeToolContext(client));
 }
 
 async function main(): Promise<void> {
