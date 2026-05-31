@@ -196,3 +196,15 @@ export function keyEvents(keys: string): CdpCommand[] {
 
   return cmds;
 }
+
+// --- Text & screenshot ------------------------------------------------------
+
+/** Input.insertText (types literal text into the focused node). */
+export function insertTextCmd(text: string): CdpCommand {
+  return { method: 'Input.insertText', params: { text } };
+}
+
+/** Params object for Page.captureScreenshot. fullPage => captureBeyondViewport. */
+export function screenshotParams(fullPage: boolean): Record<string, unknown> {
+  return { format: 'png', captureBeyondViewport: fullPage };
+}
