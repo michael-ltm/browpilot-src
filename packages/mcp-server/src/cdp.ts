@@ -24,7 +24,7 @@ export function clickEvents(
   const cmds: CdpCommand[] = [
     {
       method: 'Input.dispatchMouseEvent',
-      params: { type: 'mouseMoved', x, y, button, buttons: 0, clickCount: 0 },
+      params: { type: 'mouseMoved', x, y, button: 'none', buttons: 0, clickCount: 0 },
     },
   ];
   for (let i = 1; i <= count; i++) {
@@ -51,11 +51,14 @@ export function wheelEvent(deltaX: number, deltaY: number, x = 0, y = 0): CdpCom
 /** Center of a DOM.getBoxModel quad: [x1,y1,x2,y2,x3,y3,x4,y4]. */
 export function boxCenter(quad: number[]): { x: number; y: number } {
   if (!Array.isArray(quad) || quad.length !== 8) {
-    throw new Error(`boxCenter: expected an 8-number quad, got length ${quad?.length}`);
+    throw new Error(`boxCenter: expected an 8-number quad, got length ${quad.length}`);
   }
-  const xs = [quad[0], quad[2], quad[4], quad[6]];
-  const ys = [quad[1], quad[3], quad[5], quad[7]];
-  const x = (xs[0] + xs[1] + xs[2] + xs[3]) / 4;
-  const y = (ys[0] + ys[1] + ys[2] + ys[3]) / 4;
+  // Length is exactly 8 (guarded above); non-null assertions are safe here.
+  /* eslint-disable @typescript-eslint/no-non-null-assertion */
+  const xs = [quad[0]!, quad[2]!, quad[4]!, quad[6]!];
+  const ys = [quad[1]!, quad[3]!, quad[5]!, quad[7]!];
+  const x = (xs[0]! + xs[1]! + xs[2]! + xs[3]!) / 4;
+  const y = (ys[0]! + ys[1]! + ys[2]! + ys[3]!) / 4;
+  /* eslint-enable @typescript-eslint/no-non-null-assertion */
   return { x, y };
 }
