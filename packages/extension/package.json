@@ -7,7 +7,7 @@
     "build": "node esbuild.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@claude-browser/shared": "*"
