@@ -219,6 +219,32 @@ describe('Router', () => {
     expect(resp.result).toEqual({ pong: true });
   });
 
+  it('does NOT claim a lease when the browser returns an error for ATTACH (no phantom lease)', async () => {
+    router.registerBrowser(browserSend);
+    router.registerAgent('sess-1', agentSend);
+    const a2 = vi.fn();
+    router.registerAgent('sess-2', a2);
+
+    // sess-1 ATTACHes tab 55, but the browser responds with an error (e.g. tab not found).
+    const attach: JsonRpcRequest = { jsonrpc: '2.0', id: 1, method: Method.ATTACH, params: { tabId: 55 } };
+    const pa = router.routeRequest('sess-1', attach);
+    const fwd = lastBrowserRequest(browserSend);
+    router.handleBrowserMessage({
+      jsonrpc: '2.0',
+      id: fwd.id,
+      error: { code: ErrorCode.CDP_ERROR, message: 'tab not found' },
+    });
+    const r1 = (await pa) as JsonRpcErrorResponse;
+    expect(r1.error.code).toBe(ErrorCode.CDP_ERROR);
+
+    // sess-2 should now be able to ATTACH the same tab — no phantom lease was created.
+    const attach2: JsonRpcRequest = { jsonrpc: '2.0', id: 2, method: Method.ATTACH, params: { tabId: 55 } };
+    const pa2 = router.routeRequest('sess-2', attach2);
+    router.handleBrowserMessage({ jsonrpc: '2.0', id: lastBrowserRequest(browserSend).id, result: {} });
+    const r2 = (await pa2) as JsonRpcSuccess;
+    expect('error' in r2).toBe(false);
+  });
+
   it('releases leases held by a session when that agent disconnects', async () => {
     router.registerBrowser(browserSend);
     router.registerAgent('sess-1', agentSend);

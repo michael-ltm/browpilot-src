@@ -22,7 +22,17 @@ type Send = (msg: JsonRpcMessage) => void;
 interface Pending {
   originalId: number | string;
   sessionId: string;
+  /**
+   * Resolves (never rejects) with the response message — error responses are
+   * returned as JsonRpcErrorResponse values rather than thrown, which avoids
+   * unhandled-rejection noise. (The spec draft names this field `reject`, but
+   * always resolving is safer in practice.)
+   */
   resolve: (msg: JsonRpcMessage) => void;
+  /** Original method, used to apply lease side effects on browser ACK. */
+  method: string;
+  /** Original params, used to apply lease side effects on browser ACK. */
+  params: unknown;
 }
 
 function errorResponse(
@@ -125,9 +135,13 @@ export class Router {
     };
 
     return new Promise<JsonRpcMessage>((resolve) => {
-      this.pending.set(correlationId, { originalId: req.id, sessionId, resolve });
-      // Apply lease side effects only once forwarding succeeds.
-      this.applyLeaseSideEffects(sessionId, req);
+      this.pending.set(correlationId, {
+        originalId: req.id,
+        sessionId,
+        resolve,
+        method: req.method,
+        params: req.params,
+      });
       this.browserSend!(forwarded);
     });
   }
@@ -156,12 +170,12 @@ export class Router {
     return null;
   }
 
-  private applyLeaseSideEffects(sessionId: string, req: JsonRpcRequest): void {
-    if (req.method === Method.ATTACH) {
-      const { tabId } = (req.params ?? {}) as AttachParams;
+  private applyLeaseSideEffects(sessionId: string, method: string, params: unknown): void {
+    if (method === Method.ATTACH) {
+      const { tabId } = ((params ?? {}) as AttachParams);
       this.leases.set(tabId, sessionId);
-    } else if (req.method === Method.DETACH) {
-      const { tabId } = (req.params ?? {}) as DetachParams;
+    } else if (method === Method.DETACH) {
+      const { tabId } = ((params ?? {}) as DetachParams);
       if (this.leases.get(tabId) === sessionId) this.leases.delete(tabId);
     }
   }
@@ -175,15 +189,17 @@ export class Router {
   handleBrowserMessage(msg: JsonRpcMessage): void {
     // R2: Browser-originated request (id + method) — answer locally.
     if ('id' in msg && msg.id !== null && 'method' in msg) {
-      const req = msg as JsonRpcRequest;
-      if (req.method === Method.PING) {
-        this.browserSend!({ jsonrpc: '2.0', id: req.id, result: { pong: true } });
-      } else {
-        this.browserSend!({
-          jsonrpc: '2.0',
-          id: req.id,
-          error: { code: ErrorCode.METHOD_NOT_FOUND, message: `No broker handler for ${req.method}` },
-        });
+      if (this.browserSend) {
+        const req = msg as JsonRpcRequest;
+        if (req.method === Method.PING) {
+          this.browserSend({ jsonrpc: '2.0', id: req.id, result: { pong: true } });
+        } else {
+          this.browserSend({
+            jsonrpc: '2.0',
+            id: req.id,
+            error: { code: ErrorCode.METHOD_NOT_FOUND, message: `No broker handler for ${req.method}` },
+          });
+        }
       }
       return;
     }
@@ -195,6 +211,10 @@ export class Router {
       if (entry === undefined) return;
       this.pending.delete(correlationId);
       if ('result' in msg) {
+        // Apply lease side effects only on a successful browser ACK. This
+        // prevents phantom leases when the browser returns an error for ATTACH
+        // (e.g. tab not found) — the lease map is never updated in that case.
+        this.applyLeaseSideEffects(entry.sessionId, entry.method, entry.params);
         entry.resolve({ jsonrpc: '2.0', id: entry.originalId, result: (msg as JsonRpcSuccess).result });
       } else {
         const err = (msg as JsonRpcErrorResponse).error;
