@@ -127,8 +127,10 @@ export const KEY_MAP: Record<string, KeyDef> = (() => {
 })();
 
 function resolveKey(name: string): KeyDef {
-  if (KEY_MAP[name]) return KEY_MAP[name];
-  if (name.length === 1 && KEY_MAP[name.toLowerCase()]) return KEY_MAP[name.toLowerCase()];
+  /* eslint-disable @typescript-eslint/no-non-null-assertion */
+  if (KEY_MAP[name]) return KEY_MAP[name]!;
+  if (name.length === 1 && KEY_MAP[name.toLowerCase()]) return KEY_MAP[name.toLowerCase()]!;
+  /* eslint-enable @typescript-eslint/no-non-null-assertion */
   throw new Error(`keyEvents: unknown key "${name}"`);
 }
 
@@ -141,7 +143,8 @@ export function keyEvents(keys: string): CdpCommand[] {
   const parts = keys.split('+').map((p) => p.trim()).filter(Boolean);
   if (parts.length === 0) throw new Error('keyEvents: empty key sequence');
 
-  const mainName = parts[parts.length - 1];
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const mainName = parts[parts.length - 1]!;
   const modifierNames = parts.slice(0, -1);
 
   let mask = 0;
@@ -160,7 +163,8 @@ export function keyEvents(keys: string): CdpCommand[] {
   let accum = 0;
   for (const bit of modifierBits) {
     accum |= bit;
-    const def = MODIFIER_KEY[bit];
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const def = MODIFIER_KEY[bit]!;
     cmds.push({
       method: 'Input.dispatchKeyEvent',
       params: { type: 'rawKeyDown', key: def.key, code: def.code, windowsVirtualKeyCode: def.windowsVirtualKeyCode, modifiers: accum },
@@ -179,9 +183,11 @@ export function keyEvents(keys: string): CdpCommand[] {
 
   // Modifier key-ups in reverse, peeling the bitmask back down.
   for (let i = modifierBits.length - 1; i >= 0; i--) {
-    const bit = modifierBits[i];
+    /* eslint-disable @typescript-eslint/no-non-null-assertion */
+    const bit = modifierBits[i]!;
     accum &= ~bit;
-    const def = MODIFIER_KEY[bit];
+    const def = MODIFIER_KEY[bit]!;
+    /* eslint-enable @typescript-eslint/no-non-null-assertion */
     cmds.push({
       method: 'Input.dispatchKeyEvent',
       params: { type: 'keyUp', key: def.key, code: def.code, windowsVirtualKeyCode: def.windowsVirtualKeyCode, modifiers: accum },
