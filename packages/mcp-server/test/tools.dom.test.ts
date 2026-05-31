@@ -62,7 +62,7 @@ describe('dom tools', () => {
     client.onCdp('Accessibility.getFullAXTree', SAMPLE_AX);
     const res = await tool('browser_snapshot').handler({ tabId: 5 }, ctx);
     expect(client.calls[0]).toMatchObject({ method: Method.ATTACH, params: { tabId: 5 } });
-    expect(client.cdpCalls()[0].method).toBe('Accessibility.getFullAXTree');
+    expect(client.cdpCalls()[0]!.method).toBe('Accessibility.getFullAXTree');
     expect(ctx.refs.get('ref1')).toBe(100);
     expect(res.content[0]).toMatchObject({ type: 'text' });
   });
@@ -99,7 +99,7 @@ describe('dom tools', () => {
   it('browser_query runs Runtime.evaluate with a querySelector expression', async () => {
     client.onCdp('Runtime.evaluate', { result: { value: '["#main"]' } });
     await tool('browser_query').handler({ selector: '#main', tabId: 5 }, ctx);
-    const ev = client.cdpCalls()[0];
+    const ev = client.cdpCalls()[0]!;
     expect(ev.method).toBe('Runtime.evaluate');
     expect(String(ev.params?.expression)).toContain('#main');
     expect(ev.params).toMatchObject({ returnByValue: true });
@@ -108,7 +108,7 @@ describe('dom tools', () => {
   it('browser_get_text evaluates innerText for a selector (or body when omitted)', async () => {
     client.onCdp('Runtime.evaluate', { result: { value: 'hello' } });
     await tool('browser_get_text').handler({ tabId: 5 }, ctx);
-    const ev = client.cdpCalls()[0];
+    const ev = client.cdpCalls()[0]!;
     expect(String(ev.params?.expression)).toContain('innerText');
   });
 
@@ -117,7 +117,7 @@ describe('dom tools', () => {
     const t = tool('browser_eval');
     expect(t.description.toLowerCase()).toContain('arbitrary');
     await t.handler({ expression: '40 + 2', tabId: 5 }, ctx);
-    const ev = client.cdpCalls()[0];
+    const ev = client.cdpCalls()[0]!;
     expect(ev.params).toMatchObject({ expression: '40 + 2', returnByValue: true });
   });
 });
