@@ -35,7 +35,9 @@ async function connectedClient() {
     sessionId: 'sess-1',
     socketFactory: () => socket,
     spawnBroker: () => { /* no-op */ },
-    delay: () => Promise.resolve(),
+    // Use a never-resolving delay so any background reconnect triggered by an
+    // unexpected close() in tests parks on the first delay call and never spins.
+    delay: () => new Promise<void>(() => { /* never resolves */ }),
   });
   const connected = client.connectWithRetry();
   socket.emit('open', undefined);

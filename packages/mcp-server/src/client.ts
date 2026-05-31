@@ -57,7 +57,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 /** Spawn the broker bin detached so it outlives this MCP process. */
 function defaultSpawnBroker(): void {
   // The broker bin is published as @claude-browser/broker; resolve its dist entry
-  // relative to this module's location inside node_modules.
+  // inside the @claude-browser scope (workspace or node_modules).
   const here = dirname(fileURLToPath(import.meta.url));
   const brokerEntry = resolvePath(here, '../../broker/dist/index.js');
   const child = spawn(process.execPath, [brokerEntry], {
@@ -78,6 +78,7 @@ export class BrokerClient {
   private readonly maxBackoffMs: number;
   private brokerSpawned = false;
   private reconnecting = false;
+  private destroyed = false;
 
   private socket: ClientSocket | null = null;
   private nextId = 1;
@@ -162,6 +163,10 @@ export class BrokerClient {
       });
       socket.on('close', () => {
         this.handleClose();
+        if (this.destroyed) {
+          // Intentional teardown via close() — do not reconnect.
+          return;
+        }
         if (settled && !this.reconnecting) {
           this.reconnecting = true;
           // Reset the spawn latch so that a subsequent ECONNREFUSED (e.g. the
@@ -212,6 +217,7 @@ export class BrokerClient {
   }
 
   close(): void {
+    this.destroyed = true;
     this.socket?.close();
   }
 
