@@ -1,6 +1,13 @@
 import { loadConfig } from './config.js';
 import { startServer } from './server.js';
 
+// Re-export library API so consumers (e.g. scripts/install.ts) can import
+// from '@claude-browser/broker' without reaching into internal modules.
+export { startServer } from './server.js';
+export type { BrokerServer, ServerDeps } from './server.js';
+export { renderLaunchdPlist, LAUNCHD_LABEL } from './launchd.js';
+export type { LaunchdOptions } from './launchd.js';
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const server = await startServer(config);
