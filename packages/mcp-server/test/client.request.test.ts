@@ -27,22 +27,25 @@ class FakeSocket implements ClientSocket {
   }
 }
 
-function connectedClient() {
+async function connectedClient() {
   const socket = new FakeSocket();
   const client = new BrokerClient({
     port: 8787,
     token: 'tok',
     sessionId: 'sess-1',
     socketFactory: () => socket,
+    spawnBroker: () => { /* no-op */ },
+    delay: () => Promise.resolve(),
   });
-  client.connect();
+  const connected = client.connectWithRetry();
   socket.emit('open', undefined);
+  await connected;
   return { socket, client };
 }
 
 describe('BrokerClient handshake', () => {
-  it('sends AgentHello as the first message on open', () => {
-    const { socket } = connectedClient();
+  it('sends AgentHello as the first message on open', async () => {
+    const { socket } = await connectedClient();
     expect(JSON.parse(socket.sent[0]!)).toEqual({
       type: 'hello',
       role: 'agent',
@@ -56,7 +59,7 @@ describe('BrokerClient.request', () => {
   beforeEach(() => vi.useRealTimers());
 
   it('sends a JSON-RPC request with an incrementing numeric id and resolves on matching result', async () => {
-    const { socket, client } = connectedClient();
+    const { socket, client } = await connectedClient();
     const p = client.request(Method.GET_TABS, {});
     const req = socket.lastSent();
     expect(req).toMatchObject({ jsonrpc: '2.0', method: 'getTabs', params: {} });
@@ -67,7 +70,7 @@ describe('BrokerClient.request', () => {
   });
 
   it('rejects with the typed error code carried in a JSON-RPC error response', async () => {
-    const { socket, client } = connectedClient();
+    const { socket, client } = await connectedClient();
     const p = client.request(Method.ATTACH, { tabId: 7 });
     const id = (socket.lastSent() as { id: number }).id;
     socket.deliver({ jsonrpc: '2.0', id, error: { code: ErrorCode.TAB_NOT_FOUND, message: 'no tab 7' } });
@@ -75,8 +78,8 @@ describe('BrokerClient.request', () => {
   });
 
   it('rejects with ErrorCode.TIMEOUT when no response arrives before timeoutMs', async () => {
+    const { client } = await connectedClient();
     vi.useFakeTimers();
-    const { client } = connectedClient();
     const p = client.request(Method.PING, {}, 50);
     const assertion = expect(p).rejects.toMatchObject({ code: ErrorCode.TIMEOUT });
     await vi.advanceTimersByTimeAsync(60);
@@ -85,7 +88,7 @@ describe('BrokerClient.request', () => {
   });
 
   it('rejects all pending requests with EXTENSION_DISCONNECTED on socket close', async () => {
-    const { socket, client } = connectedClient();
+    const { socket, client } = await connectedClient();
     const p = client.request(Method.GET_TABS, {});
     socket.close();
     await expect(p).rejects.toMatchObject({ code: ErrorCode.EXTENSION_DISCONNECTED });
@@ -93,8 +96,8 @@ describe('BrokerClient.request', () => {
 });
 
 describe('BrokerClient notifications', () => {
-  it('dispatches incoming notifications (no id) to onNotification listeners', () => {
-    const { socket, client } = connectedClient();
+  it('dispatches incoming notifications (no id) to onNotification listeners', async () => {
+    const { socket, client } = await connectedClient();
     const seen: Array<{ method: string; params: unknown }> = [];
     client.onNotification((method, params) => seen.push({ method, params }));
     socket.deliver({ jsonrpc: '2.0', method: Notif.ON_STATUS, params: { state: 'connected' } });

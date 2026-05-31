@@ -120,3 +120,122 @@ describe('BrokerClient.connectWithRetry', () => {
     expect(delays).toEqual([100, 200, 400, 400]);
   });
 });
+
+describe('BrokerClient close-after-open auto-reconnect', () => {
+  it('reconnects automatically when an established connection closes', async () => {
+    const sockets: ScriptedSocket[] = [];
+    const spawnBroker = vi.fn();
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    const client = new BrokerClient({
+      port: 8787,
+      token: 'tok',
+      sessionId: 's',
+      socketFactory: () => {
+        const s = new ScriptedSocket();
+        sockets.push(s);
+        return s;
+      },
+      spawnBroker,
+      delay,
+    });
+
+    // Connect initially and open the first socket.
+    const firstConnect = client.connectWithRetry();
+    await Promise.resolve();
+    sockets[0]!.emit('open', undefined);
+    await firstConnect;
+    expect(client.isOpen).toBe(true);
+
+    // Close the established connection; the client should auto-reconnect.
+    sockets[0]!.emit('close', undefined);
+
+    // Wait for the second socket to be created and open it.
+    await vi.waitFor(() => expect(sockets.length).toBe(2));
+    sockets[1]!.emit('open', undefined);
+
+    await vi.waitFor(() => expect(client.isOpen).toBe(true));
+
+    // Broker should not have been spawned (no ECONNREFUSED).
+    expect(spawnBroker).not.toHaveBeenCalled();
+  });
+
+  it('resets brokerSpawned after close so a subsequent ECONNREFUSED triggers a fresh spawn', async () => {
+    const sockets: ScriptedSocket[] = [];
+    const spawnBroker = vi.fn();
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    const client = new BrokerClient({
+      port: 8787,
+      token: 'tok',
+      sessionId: 's',
+      socketFactory: () => {
+        const s = new ScriptedSocket();
+        sockets.push(s);
+        return s;
+      },
+      spawnBroker,
+      delay,
+    });
+
+    // First connect: ECONNREFUSED → spawn → retry → open.
+    const firstConnect = client.connectWithRetry();
+    await Promise.resolve();
+    sockets[0]!.emit('error', Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }));
+    await vi.waitFor(() => expect(sockets.length).toBe(2));
+    sockets[1]!.emit('open', undefined);
+    await firstConnect;
+    expect(spawnBroker).toHaveBeenCalledTimes(1);
+
+    // Simulate broker crash: close the established connection.
+    sockets[1]!.emit('close', undefined);
+
+    // The reconnect attempt gets ECONNREFUSED again → must spawn a second time.
+    await vi.waitFor(() => expect(sockets.length).toBe(3));
+    sockets[2]!.emit('error', Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }));
+
+    await vi.waitFor(() => expect(sockets.length).toBe(4));
+    sockets[3]!.emit('open', undefined);
+
+    await vi.waitFor(() => expect(client.isOpen).toBe(true));
+    expect(spawnBroker).toHaveBeenCalledTimes(2);
+  });
+
+  it('the reconnecting guard prevents concurrent reconnect storms', async () => {
+    const sockets: ScriptedSocket[] = [];
+    const spawnBroker = vi.fn();
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    const client = new BrokerClient({
+      port: 8787,
+      token: 'tok',
+      sessionId: 's',
+      socketFactory: () => {
+        const s = new ScriptedSocket();
+        sockets.push(s);
+        return s;
+      },
+      spawnBroker,
+      delay,
+    });
+
+    // Connect and open.
+    const firstConnect = client.connectWithRetry();
+    await Promise.resolve();
+    sockets[0]!.emit('open', undefined);
+    await firstConnect;
+
+    // Emit close twice rapidly — should only trigger one reconnect.
+    sockets[0]!.emit('close', undefined);
+    sockets[0]!.emit('close', undefined);
+
+    // Only one new socket should be created (not two).
+    await vi.waitFor(() => expect(sockets.length).toBe(2));
+    // Allow a tick for any unintended second socket creation.
+    await Promise.resolve();
+    expect(sockets.length).toBe(2);
+
+    sockets[1]!.emit('open', undefined);
+    await vi.waitFor(() => expect(client.isOpen).toBe(true));
+  });
+});

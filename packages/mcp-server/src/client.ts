@@ -92,7 +92,7 @@ export class BrokerClient {
     this.makeSocket =
       opts.socketFactory ??
       ((url) => new WebSocket(url) as unknown as ClientSocket);
-    this.spawnBroker = opts.spawnBroker ?? (() => defaultSpawnBroker());
+    this.spawnBroker = opts.spawnBroker ?? defaultSpawnBroker;
     this.delay =
       opts.delay ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
     this.baseBackoffMs = opts.baseBackoffMs ?? 200;
@@ -105,27 +105,6 @@ export class BrokerClient {
 
   get isOpen(): boolean {
     return this.opened;
-  }
-
-  /** Open the socket and wire handlers. Sends AgentHello on 'open'. */
-  connect(): void {
-    const socket = this.makeSocket(this.url);
-    this.socket = socket;
-    socket.on('open', () => {
-      this.opened = true;
-      const hello: AgentHello = {
-        type: 'hello',
-        role: 'agent',
-        token: this.token,
-        sessionId: this.sessionId,
-      };
-      socket.send(JSON.stringify(hello));
-    });
-    socket.on('message', (data) => this.handleMessage(data));
-    socket.on('close', () => this.handleClose());
-    socket.on('error', () => {
-      /* surfaced via 'close'; per-request timeouts cover hangs */
-    });
   }
 
   /**
@@ -185,6 +164,10 @@ export class BrokerClient {
         this.handleClose();
         if (settled && !this.reconnecting) {
           this.reconnecting = true;
+          // Reset the spawn latch so that a subsequent ECONNREFUSED (e.g. the
+          // broker crashed) will trigger a fresh spawn rather than looping forever
+          // with no broker to connect to.
+          this.brokerSpawned = false;
           void this.connectWithRetry().finally(() => {
             this.reconnecting = false;
           });
