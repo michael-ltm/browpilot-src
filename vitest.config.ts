@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 // real-Chrome integration suite.
 export default defineConfig({
   test: {
-    include: ['packages/**/test/**/*.test.ts'],
+    include: ['packages/**/test/**/*.test.ts', 'scripts/lib/**/*.test.ts'],
     exclude: ['**/node_modules/**', 'test/integration/**'],
   },
 });
