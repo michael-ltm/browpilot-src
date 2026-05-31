@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   ErrorCode,
   Method,
@@ -263,5 +263,72 @@ describe('Router', () => {
     router.handleBrowserMessage({ jsonrpc: '2.0', id: lastBrowserRequest(browserSend).id, result: {} });
     const r = (await pa2) as JsonRpcSuccess;
     expect('error' in r).toBe(false);
+  });
+
+  it('blocks a concurrent ATTACH from a second session before the first ACK returns (optimistic lease)', async () => {
+    router.registerBrowser(browserSend);
+    router.registerAgent('sess-1', agentSend);
+    router.registerAgent('sess-2', vi.fn());
+
+    // Both sessions attempt to ATTACH tab 77 before either browser ACK arrives.
+    const attach1: JsonRpcRequest = { jsonrpc: '2.0', id: 1, method: Method.ATTACH, params: { tabId: 77 } };
+    const attach2: JsonRpcRequest = { jsonrpc: '2.0', id: 2, method: Method.ATTACH, params: { tabId: 77 } };
+
+    const p1 = router.routeRequest('sess-1', attach1);
+    // The second request is issued synchronously before any ACK arrives.
+    const p2 = router.routeRequest('sess-2', attach2);
+
+    // Resolve sess-1's pending request with success.
+    const fwdReqs = sent<JsonRpcRequest>(browserSend).filter((m) => 'method' in m && 'id' in m);
+    router.handleBrowserMessage({ jsonrpc: '2.0', id: fwdReqs[0].id, result: {} });
+
+    const r1 = (await p1) as JsonRpcSuccess;
+    expect('error' in r1).toBe(false);
+
+    // sess-2's request should have been denied immediately (LEASE_DENIED), never forwarded.
+    const r2 = (await p2) as JsonRpcErrorResponse;
+    expect(r2.error.code).toBe(ErrorCode.LEASE_DENIED);
+  });
+
+  it('resolves with TIMEOUT if the browser does not respond within the timeout window', async () => {
+    vi.useFakeTimers();
+    router.registerBrowser(browserSend);
+    router.registerAgent('sess-1', agentSend);
+
+    const req: JsonRpcRequest = { jsonrpc: '2.0', id: 5, method: Method.GET_TABS };
+    const pending = router.routeRequest('sess-1', req);
+
+    // Advance time past the 30 s timeout.
+    vi.advanceTimersByTime(31_000);
+
+    const resp = (await pending) as JsonRpcErrorResponse;
+    expect(resp.id).toBe(5);
+    expect(resp.error.code).toBe(ErrorCode.TIMEOUT);
+    vi.useRealTimers();
+  });
+
+  it('rolls back an optimistic ATTACH lease when the request times out', async () => {
+    vi.useFakeTimers();
+    router.registerBrowser(browserSend);
+    router.registerAgent('sess-1', agentSend);
+    router.registerAgent('sess-2', vi.fn());
+
+    // sess-1 ATTACHes tab 88; no ACK from browser (simulate silent drop).
+    const attach1: JsonRpcRequest = { jsonrpc: '2.0', id: 1, method: Method.ATTACH, params: { tabId: 88 } };
+    const p1 = router.routeRequest('sess-1', attach1);
+
+    // Advance past timeout — sess-1's request should time out and roll back the lease.
+    vi.advanceTimersByTime(31_000);
+    const r1 = (await p1) as JsonRpcErrorResponse;
+    expect(r1.error.code).toBe(ErrorCode.TIMEOUT);
+
+    vi.useRealTimers();
+
+    // sess-2 should now be able to claim the tab (no phantom lease).
+    const attach2: JsonRpcRequest = { jsonrpc: '2.0', id: 2, method: Method.ATTACH, params: { tabId: 88 } };
+    const p2 = router.routeRequest('sess-2', attach2);
+    router.handleBrowserMessage({ jsonrpc: '2.0', id: lastBrowserRequest(browserSend).id, result: {} });
+    const r2 = (await p2) as JsonRpcSuccess;
+    expect('error' in r2).toBe(false);
   });
 });

@@ -19,6 +19,9 @@ import type { ConsoleBuffer } from './buffer.js';
 
 type Send = (msg: JsonRpcMessage) => void;
 
+/** Per-request timeout (ms). Fires ErrorCode.TIMEOUT if the browser never responds. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 interface Pending {
   originalId: number | string;
   sessionId: string;
@@ -29,10 +32,12 @@ interface Pending {
    * always resolving is safer in practice.)
    */
   resolve: (msg: JsonRpcMessage) => void;
-  /** Original method, used to apply lease side effects on browser ACK. */
+  /** Original method, retained for ATTACH lease rollback on browser error. */
   method: string;
-  /** Original params, used to apply lease side effects on browser ACK. */
+  /** Original params, retained for ATTACH lease rollback on browser error. */
   params: unknown;
+  /** Timer handle for per-request timeout. */
+  timer: ReturnType<typeof setTimeout>;
 }
 
 function errorResponse(
@@ -135,12 +140,29 @@ export class Router {
     };
 
     return new Promise<JsonRpcMessage>((resolve) => {
+      // Apply lease side effects optimistically (before the browser ACK) so that
+      // a concurrent ATTACH for the same tab from another session is blocked
+      // immediately by checkLease — rather than both requests slipping through
+      // before either ACK arrives and one silently overwriting the other's lease.
+      // If the browser returns an error for ATTACH, the lease is rolled back in
+      // handleBrowserMessage so no phantom lease is left behind.
+      this.applyLeaseSideEffects(sessionId, req.method, req.params);
+
+      const timer = setTimeout(() => {
+        if (this.pending.delete(correlationId)) {
+          // Also rollback an optimistic ATTACH lease that timed out.
+          this.rollbackAttachLease(sessionId, req.method, req.params);
+          resolve(errorResponse(req.id, ErrorCode.TIMEOUT, 'browser did not respond in time'));
+        }
+      }, REQUEST_TIMEOUT_MS);
+
       this.pending.set(correlationId, {
         originalId: req.id,
         sessionId,
         resolve,
         method: req.method,
         params: req.params,
+        timer,
       });
       this.browserSend!(forwarded);
     });
@@ -181,6 +203,20 @@ export class Router {
   }
 
   /**
+   * Rolls back an optimistically-applied ATTACH lease when the browser returns
+   * an error (or when the request times out). Only ATTACH is rolled back; DETACH
+   * is left as-is because releasing a lease on a tab the browser rejected is safe.
+   */
+  private rollbackAttachLease(sessionId: string, method: string, params: unknown): void {
+    if (method === Method.ATTACH) {
+      const { tabId } = ((params ?? {}) as AttachParams);
+      // Only clear if we still own it — a re-attach by the same session would have
+      // re-set the entry, so we must not accidentally clear a valid successor lease.
+      if (this.leases.get(tabId) === sessionId) this.leases.delete(tabId);
+    }
+  }
+
+  /**
    * Handle any message coming from the browser link.
    *
    * R2: Browser-originated REQUEST (has both id AND method): answer locally, do NOT route.
@@ -206,17 +242,21 @@ export class Router {
 
     // Browser response (id + result/error) → resolve the matching pending entry.
     if ('id' in msg && msg.id !== null && ('result' in msg || 'error' in msg)) {
+      // The broker always issues integer correlation IDs (nextCorrelationId++), so
+      // msg.id is expected to be a number. The Number() coercion handles the edge
+      // case where a well-behaved browser echoes it back as a string (e.g. "1").
       const correlationId = typeof msg.id === 'number' ? msg.id : Number(msg.id);
       const entry = this.pending.get(correlationId);
       if (entry === undefined) return;
       this.pending.delete(correlationId);
+      clearTimeout(entry.timer);
       if ('result' in msg) {
-        // Apply lease side effects only on a successful browser ACK. This
-        // prevents phantom leases when the browser returns an error for ATTACH
-        // (e.g. tab not found) — the lease map is never updated in that case.
-        this.applyLeaseSideEffects(entry.sessionId, entry.method, entry.params);
+        // Lease side effects were already applied optimistically at forward time.
         entry.resolve({ jsonrpc: '2.0', id: entry.originalId, result: (msg as JsonRpcSuccess).result });
       } else {
+        // On error, roll back the optimistically-applied ATTACH lease so no
+        // phantom lease is left behind (e.g. when the browser says tab not found).
+        this.rollbackAttachLease(entry.sessionId, entry.method, entry.params);
         const err = (msg as JsonRpcErrorResponse).error;
         entry.resolve({ jsonrpc: '2.0', id: entry.originalId, error: err });
       }
@@ -241,6 +281,7 @@ export class Router {
   onBrowserDisconnect(): void {
     this.browserSend = null;
     for (const [, entry] of this.pending) {
+      clearTimeout(entry.timer);
       entry.resolve(
         errorResponse(entry.originalId, ErrorCode.EXTENSION_DISCONNECTED, 'browser extension disconnected'),
       );
@@ -257,7 +298,10 @@ export class Router {
       if (owner === sessionId) this.leases.delete(tabId);
     }
     for (const [cid, entry] of this.pending) {
-      if (entry.sessionId === sessionId) this.pending.delete(cid);
+      if (entry.sessionId === sessionId) {
+        clearTimeout(entry.timer);
+        this.pending.delete(cid);
+      }
     }
   }
 }
