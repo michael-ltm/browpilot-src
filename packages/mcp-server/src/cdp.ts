@@ -62,3 +62,131 @@ export function boxCenter(quad: number[]): { x: number; y: number } {
   /* eslint-enable @typescript-eslint/no-non-null-assertion */
   return { x, y };
 }
+
+// --- Keyboard ---------------------------------------------------------------
+
+export interface KeyDef {
+  key: string;
+  code: string;
+  windowsVirtualKeyCode: number;
+}
+
+const MODIFIER_BIT: Record<string, number> = {
+  alt: 1,
+  control: 2,
+  ctrl: 2,
+  meta: 4,
+  cmd: 4,
+  command: 4,
+  shift: 8,
+};
+
+const MODIFIER_KEY: Record<number, KeyDef> = {
+  1: { key: 'Alt', code: 'AltLeft', windowsVirtualKeyCode: 18 },
+  2: { key: 'Control', code: 'ControlLeft', windowsVirtualKeyCode: 17 },
+  4: { key: 'Meta', code: 'MetaLeft', windowsVirtualKeyCode: 91 },
+  8: { key: 'Shift', code: 'ShiftLeft', windowsVirtualKeyCode: 16 },
+};
+
+function letterDef(ch: string): KeyDef {
+  const upper = ch.toUpperCase();
+  return { key: ch, code: `Key${upper}`, windowsVirtualKeyCode: upper.charCodeAt(0) };
+}
+
+function digitDef(d: string): KeyDef {
+  return { key: d, code: `Digit${d}`, windowsVirtualKeyCode: d.charCodeAt(0) };
+}
+
+const NAMED_KEYS: Record<string, KeyDef> = {
+  Enter: { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 },
+  Tab: { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 },
+  Escape: { key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 },
+  Backspace: { key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 },
+  Delete: { key: 'Delete', code: 'Delete', windowsVirtualKeyCode: 46 },
+  Space: { key: ' ', code: 'Space', windowsVirtualKeyCode: 32 },
+  ArrowUp: { key: 'ArrowUp', code: 'ArrowUp', windowsVirtualKeyCode: 38 },
+  ArrowDown: { key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 },
+  ArrowLeft: { key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 },
+  ArrowRight: { key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 },
+  Home: { key: 'Home', code: 'Home', windowsVirtualKeyCode: 36 },
+  End: { key: 'End', code: 'End', windowsVirtualKeyCode: 35 },
+  PageUp: { key: 'PageUp', code: 'PageUp', windowsVirtualKeyCode: 33 },
+  PageDown: { key: 'PageDown', code: 'PageDown', windowsVirtualKeyCode: 34 },
+};
+
+/** Human key name -> CDP key definition. Single letters/digits are generated. */
+export const KEY_MAP: Record<string, KeyDef> = (() => {
+  const map: Record<string, KeyDef> = { ...NAMED_KEYS };
+  for (let c = 97; c <= 122; c++) {
+    const lower = String.fromCharCode(c);
+    map[lower] = letterDef(lower);
+    map[lower.toUpperCase()] = letterDef(lower);
+  }
+  for (let d = 0; d <= 9; d++) map[String(d)] = digitDef(String(d));
+  return map;
+})();
+
+function resolveKey(name: string): KeyDef {
+  if (KEY_MAP[name]) return KEY_MAP[name];
+  if (name.length === 1 && KEY_MAP[name.toLowerCase()]) return KEY_MAP[name.toLowerCase()];
+  throw new Error(`keyEvents: unknown key "${name}"`);
+}
+
+/**
+ * Builds dispatchKeyEvent commands for a single key or a chord like "Cmd+A".
+ * Order: each modifier down (accumulating bitmask), the inner key down+up with
+ * the full modifier bitmask, then each modifier up in reverse.
+ */
+export function keyEvents(keys: string): CdpCommand[] {
+  const parts = keys.split('+').map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) throw new Error('keyEvents: empty key sequence');
+
+  const mainName = parts[parts.length - 1];
+  const modifierNames = parts.slice(0, -1);
+
+  let mask = 0;
+  const modifierBits: number[] = [];
+  for (const m of modifierNames) {
+    const bit = MODIFIER_BIT[m.toLowerCase()];
+    if (bit === undefined) throw new Error(`keyEvents: unknown modifier "${m}"`);
+    mask |= bit;
+    modifierBits.push(bit);
+  }
+
+  const main = resolveKey(mainName);
+  const cmds: CdpCommand[] = [];
+
+  // Modifier key-downs, accumulating the bitmask as each goes down.
+  let accum = 0;
+  for (const bit of modifierBits) {
+    accum |= bit;
+    const def = MODIFIER_KEY[bit];
+    cmds.push({
+      method: 'Input.dispatchKeyEvent',
+      params: { type: 'rawKeyDown', key: def.key, code: def.code, windowsVirtualKeyCode: def.windowsVirtualKeyCode, modifiers: accum },
+    });
+  }
+
+  // Inner key with the full modifier mask applied.
+  cmds.push({
+    method: 'Input.dispatchKeyEvent',
+    params: { type: 'rawKeyDown', key: main.key, code: main.code, windowsVirtualKeyCode: main.windowsVirtualKeyCode, modifiers: mask },
+  });
+  cmds.push({
+    method: 'Input.dispatchKeyEvent',
+    params: { type: 'keyUp', key: main.key, code: main.code, windowsVirtualKeyCode: main.windowsVirtualKeyCode, modifiers: mask },
+  });
+
+  // Modifier key-ups in reverse, peeling the bitmask back down.
+  for (let i = modifierBits.length - 1; i >= 0; i--) {
+    const bit = modifierBits[i];
+    accum &= ~bit;
+    const def = MODIFIER_KEY[bit];
+    cmds.push({
+      method: 'Input.dispatchKeyEvent',
+      params: { type: 'keyUp', key: def.key, code: def.code, windowsVirtualKeyCode: def.windowsVirtualKeyCode, modifiers: accum },
+    });
+  }
+
+  return cmds;
+}
