@@ -3,8 +3,12 @@ import { Method, type ExecuteCdpParams, type CdpTarget } from '@claude-browser/s
 import type { ToolContext } from '../context.js';
 import type { CdpCommand } from '../cdp.js';
 
-/** MCP-ish content block returned by a tool handler. */
+/** MCP-ish content block returned by a tool handler.
+ * The index signature satisfies McpServer.registerTool()'s CallToolResult constraint
+ * (CallToolResultSchema uses z.core.$loose which requires { [x: string]: unknown }).
+ */
 export interface ToolResult {
+  [x: string]: unknown;
   content: Array<
     | { type: 'text'; text: string }
     | { type: 'image'; data: string; mimeType: string }
