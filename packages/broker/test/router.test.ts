@@ -209,6 +209,16 @@ describe('Router', () => {
     expect(notifs.some((m) => (m as { method: string }).method === Notif.ON_STATUS)).toBe(true);
   });
 
+  it('answers a browser-originated ping request with { pong: true } on the browser link', () => {
+    router.registerBrowser(browserSend);
+    const pingReq: JsonRpcRequest = { jsonrpc: '2.0', id: 1, method: Method.PING };
+    router.handleBrowserMessage(pingReq);
+    expect(browserSend).toHaveBeenCalledOnce();
+    const resp = browserSend.mock.calls[0][0] as JsonRpcSuccess;
+    expect(resp.id).toBe(1);
+    expect(resp.result).toEqual({ pong: true });
+  });
+
   it('releases leases held by a session when that agent disconnects', async () => {
     router.registerBrowser(browserSend);
     router.registerAgent('sess-1', agentSend);
