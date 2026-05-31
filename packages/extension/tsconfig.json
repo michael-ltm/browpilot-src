@@ -2,10 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
-    "types": ["chrome", "node", "vitest/globals"],
-    "rootDir": "src",
+    "types": ["chrome", "node"],
     "outDir": "dist",
     "noEmit": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "vitest.config.ts"]
 }
