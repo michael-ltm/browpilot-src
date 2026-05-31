@@ -24,12 +24,14 @@ describe('clickEvents', () => {
 
   it('maps right button to buttons bitmask 2', () => {
     const cmds = clickEvents(1, 2, 'right', 1);
+    expect(cmds[0].params).toMatchObject({ type: 'mouseMoved', button: 'right' });
     expect(cmds[1].params).toMatchObject({ button: 'right', buttons: 2, type: 'mousePressed' });
     expect(cmds[2].params).toMatchObject({ button: 'right', buttons: 0, type: 'mouseReleased' });
   });
 
   it('maps middle button to buttons bitmask 4', () => {
     const cmds = clickEvents(0, 0, 'middle', 1);
+    expect(cmds[0].params).toMatchObject({ type: 'mouseMoved', button: 'middle' });
     expect(cmds[1].params).toMatchObject({ button: 'middle', buttons: 4 });
   });
 });

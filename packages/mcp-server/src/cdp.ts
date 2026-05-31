@@ -24,12 +24,9 @@ export function clickEvents(
   const cmds: CdpCommand[] = [
     {
       method: 'Input.dispatchMouseEvent',
-      params: { type: 'mouseMoved', x, y, button: 'none', buttons: 0, clickCount: 0 },
+      params: { type: 'mouseMoved', x, y, button, buttons: 0, clickCount: 0 },
     },
   ];
-  // The moved event uses button:'none'; tests assert button passthrough on the
-  // press/release pair only. Keep moved neutral so it never registers a button.
-  cmds[0].params.button = 'left';
   for (let i = 1; i <= count; i++) {
     cmds.push({
       method: 'Input.dispatchMouseEvent',
