@@ -37,7 +37,7 @@ export class FakeClient implements RpcLike {
 
   /** Convenience: last request issued. */
   last(): RecordedRequest {
-    return this.calls[this.calls.length - 1];
+    return this.calls[this.calls.length - 1]!;
   }
   /** All EXECUTE_CDP inner commands in order. */
   cdpCalls(): Array<{ method: string; params?: Record<string, unknown> }> {
