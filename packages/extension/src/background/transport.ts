@@ -65,8 +65,9 @@ export class Transport {
   }
 
   connect(): void {
-    // Eager connect: tolerate a half-open prior socket.
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    // Guard all non-terminal states to prevent orphaned sockets.
+    // readyState: CONNECTING=0, OPEN=1, CLOSING=2, CLOSED=3
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === 0 || this.ws.readyState === 2)) return;
     this.clearReconnectTimer();
     const ws = new WebSocket(`ws://127.0.0.1:${this.opts.port}`);
     this.ws = ws;
@@ -74,6 +75,7 @@ export class Transport {
       const hello: BrowserHello = { type: 'hello', role: 'browser', extensionId: this.opts.extensionId };
       ws.send(JSON.stringify(hello));
       void this.setStatus('connected');
+      void chrome.alarms.clear(RECONNECT_ALARM);
       this.startHeartbeat();
     };
     ws.onmessage = (ev: { data: string }) => this.handleMessage(ev.data);
@@ -85,14 +87,13 @@ export class Transport {
 
   sendRequest<R = unknown>(method: string, params?: unknown): Promise<R> {
     return new Promise<R>((resolve, reject) => {
-      const id = this.nextId++;
-      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
-      const req: JsonRpcRequest = { jsonrpc: '2.0', id, method, params };
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        this.pending.delete(id);
         reject({ code: ErrorCode.EXTENSION_DISCONNECTED, message: 'socket not open' });
         return;
       }
+      const id = this.nextId++;
+      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
+      const req: JsonRpcRequest = { jsonrpc: '2.0', id, method, params };
       this.ws.send(JSON.stringify(req));
     });
   }
