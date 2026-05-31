@@ -1,4 +1,7 @@
 import WebSocket from 'ws';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve as resolvePath } from 'node:path';
 import {
   DEFAULT_PORT,
   ErrorCode,
@@ -25,6 +28,12 @@ export interface BrokerClientOptions {
   sessionId: string;
   /** Override for tests; defaults to a real `ws` WebSocket. */
   socketFactory?: SocketFactory;
+  /** Override for tests; defaults to spawning the broker bin detached. */
+  spawnBroker?: () => void;
+  /** Override for tests; defaults to setTimeout. */
+  delay?: (ms: number) => Promise<void>;
+  baseBackoffMs?: number;
+  maxBackoffMs?: number;
 }
 
 /** A typed cross-process error matching a shared ErrorCode. */
@@ -45,11 +54,30 @@ interface Pending {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
+/** Spawn the broker bin detached so it outlives this MCP process. */
+function defaultSpawnBroker(): void {
+  // The broker bin is published as @claude-browser/broker; resolve its dist entry
+  // relative to this module's location inside node_modules.
+  const here = dirname(fileURLToPath(import.meta.url));
+  const brokerEntry = resolvePath(here, '../../broker/dist/index.js');
+  const child = spawn(process.execPath, [brokerEntry], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+}
+
 export class BrokerClient {
   private readonly port: number;
   private readonly token: string;
   private readonly sessionId: string;
   private readonly makeSocket: SocketFactory;
+  private readonly spawnBroker: () => void;
+  private readonly delay: (ms: number) => Promise<void>;
+  private readonly baseBackoffMs: number;
+  private readonly maxBackoffMs: number;
+  private brokerSpawned = false;
+  private reconnecting = false;
 
   private socket: ClientSocket | null = null;
   private nextId = 1;
@@ -64,6 +92,11 @@ export class BrokerClient {
     this.makeSocket =
       opts.socketFactory ??
       ((url) => new WebSocket(url) as unknown as ClientSocket);
+    this.spawnBroker = opts.spawnBroker ?? (() => defaultSpawnBroker());
+    this.delay =
+      opts.delay ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+    this.baseBackoffMs = opts.baseBackoffMs ?? 200;
+    this.maxBackoffMs = opts.maxBackoffMs ?? 5_000;
   }
 
   get url(): string {
@@ -92,6 +125,74 @@ export class BrokerClient {
     socket.on('close', () => this.handleClose());
     socket.on('error', () => {
       /* surfaced via 'close'; per-request timeouts cover hangs */
+    });
+  }
+
+  /**
+   * Connect, retrying with capped backoff. On the first ECONNREFUSED, spawn the
+   * broker detached (once). Resolves when the socket opens.
+   */
+  async connectWithRetry(): Promise<void> {
+    let attempt = 0;
+    for (;;) {
+      try {
+        await this.connectOnce();
+        return;
+      } catch (err) {
+        const code = (err as { code?: string }).code;
+        if (code === 'ECONNREFUSED' && !this.brokerSpawned) {
+          this.brokerSpawned = true;
+          this.spawnBroker();
+        }
+        const backoff = Math.min(
+          this.baseBackoffMs * 2 ** attempt,
+          this.maxBackoffMs,
+        );
+        attempt++;
+        await this.delay(backoff);
+      }
+    }
+  }
+
+  /** Single connection attempt; resolves on 'open', rejects on 'error'. */
+  private connectOnce(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const socket = this.makeSocket(this.url);
+      this.socket = socket;
+      let settled = false;
+      socket.on('open', () => {
+        this.opened = true;
+        const hello: AgentHello = {
+          type: 'hello',
+          role: 'agent',
+          token: this.token,
+          sessionId: this.sessionId,
+        };
+        socket.send(JSON.stringify(hello));
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      });
+      socket.on('message', (data) => this.handleMessage(data));
+      socket.on('error', (err) => {
+        if (!settled) {
+          settled = true;
+          reject(err as Error);
+        }
+      });
+      socket.on('close', () => {
+        this.handleClose();
+        if (settled && !this.reconnecting) {
+          this.reconnecting = true;
+          void this.connectWithRetry().finally(() => {
+            this.reconnecting = false;
+          });
+        } else if (!settled) {
+          settled = true;
+          reject(new RpcError(ErrorCode.EXTENSION_DISCONNECTED, 'closed before open'));
+        }
+      });
     });
   }
 
