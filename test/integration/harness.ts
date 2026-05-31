@@ -36,7 +36,6 @@ export interface Harness {
 
 interface Internal {
   tmpRoot: string;
-  userDataDir: string;
   chrome: LaunchedChrome;
   broker: BrokerServer;
   client: BrokerClient;
@@ -98,7 +97,7 @@ export async function startHarness(): Promise<Harness> {
     // up to 15s, otherwise tool calls will all error with EXTENSION_DISCONNECTED.
     await waitForExtension(broker, 15_000);
 
-    const internal: Internal = { tmpRoot, userDataDir, chrome, broker, client, tools };
+    const internal: Internal = { tmpRoot, chrome, broker, client, tools };
 
     return {
       config,
@@ -112,9 +111,9 @@ export async function startHarness(): Promise<Harness> {
         internal.broker.dropBrowserConnection();
       },
       async restartMcpClient() {
-        internal.client.close();
+        try { internal.client.close(); } catch { /* ignore */ }
         internal.tools.clear();
-        internal.client = await createClient({ port, token });
+        internal.client = await createClient({ port: internal.broker.port, token });
         registerInto(internal.tools, internal.client);
       },
       async teardown() {
@@ -123,9 +122,21 @@ export async function startHarness(): Promise<Harness> {
         } catch {
           /* ignore */
         }
-        await internal.broker.close();
-        await internal.chrome.kill();
-        await rm(internal.tmpRoot, { recursive: true, force: true });
+        try {
+          await internal.broker.close();
+        } catch {
+          /* ignore */
+        }
+        try {
+          await internal.chrome.kill();
+        } catch {
+          /* ignore */
+        }
+        try {
+          await rm(internal.tmpRoot, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
       },
     };
   } catch (err) {
