@@ -1,9 +1,8 @@
 import { mkdtemp, rm, mkdir } from 'node:fs/promises';
-import { tmpdir, homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch, type LaunchedChrome } from 'chrome-launcher';
-import { resolvePaths } from '../../scripts/lib/paths.js';
 import { readPinnedExtensionId } from '../../scripts/lib/manifest.js';
 import { type Config } from '@claude-browser/shared';
 // R1: Broker exposes an in-process server factory via `startServer` (not `createServer`).
@@ -42,31 +41,22 @@ interface Internal {
   tools: Map<string, (args: Record<string, unknown>) => Promise<ToolResult>>;
 }
 
-async function ephemeralPort(): Promise<number> {
-  const net = await import('node:net');
-  return new Promise((res, rej) => {
-    const srv = net.createServer();
-    srv.on('error', rej);
-    srv.listen(0, '127.0.0.1', () => {
-      const port = (srv.address() as import('node:net').AddressInfo).port;
-      srv.close(() => res(port));
-    });
-  });
-}
+const extensionDist = join(REPO_ROOT, 'packages', 'extension', 'dist');
 
 export async function startHarness(): Promise<Harness> {
-  const paths = resolvePaths(REPO_ROOT, homedir());
   const tmpRoot = await mkdtemp(join(tmpdir(), 'cb-harness-'));
   const userDataDir = join(tmpRoot, 'chrome-profile');
   await mkdir(userDataDir, { recursive: true });
 
-  const port = await ephemeralPort();
-  const extensionId = await readPinnedExtensionId(paths.extensionDist);
+  const extensionId = await readPinnedExtensionId(extensionDist);
   const token = 'integration-test-token-0000000000000000000000000000000000000000';
-  const config: Config = { port, token, extensionId };
 
   // R1: use startServer (canonical export from @claude-browser/broker).
-  const broker = await startServer(config);
+  // Use port 0 so the OS assigns a free port atomically — avoids the TOCTOU
+  // race of probing a port, releasing it, then re-binding to the same number.
+  const broker = await startServer({ port: 0, token, extensionId });
+  const { port } = broker;
+  const config: Config = { port, token, extensionId };
 
   let chrome: LaunchedChrome | undefined;
   let client: BrokerClient | undefined;
@@ -76,8 +66,8 @@ export async function startHarness(): Promise<Harness> {
     // via Xvfb on Linux; on macOS dev machines this just opens a window).
     chrome = await launch({
       chromeFlags: [
-        `--load-extension=${paths.extensionDist}`,
-        `--disable-extensions-except=${paths.extensionDist}`,
+        `--load-extension=${extensionDist}`,
+        `--disable-extensions-except=${extensionDist}`,
         '--no-first-run',
         '--no-default-browser-check',
         '--disable-gpu',
@@ -128,7 +118,8 @@ export async function startHarness(): Promise<Harness> {
           /* ignore */
         }
         try {
-          await internal.chrome.kill();
+          // kill() is typed void — do not await a void return.
+          internal.chrome.kill();
         } catch {
           /* ignore */
         }
@@ -182,6 +173,10 @@ function waitForExtension(broker: BrokerServer, timeoutMs: number): Promise<void
     }, timeoutMs);
     const onConnect = () => {
       clearTimeout(timer);
+      // Deregister immediately so the callback does not fire again on subsequent
+      // reconnections (e.g. after forceExtensionOffline in soak tests), which
+      // would call res() on an already-settled Promise.
+      broker.offBrowserConnected(onConnect);
       res();
     };
     broker.onBrowserConnected(onConnect);
