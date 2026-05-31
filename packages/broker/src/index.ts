@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import { loadConfig } from './config.js';
 import { startServer } from './server.js';
 
@@ -23,8 +24,15 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-main().catch((err: unknown) => {
-  // eslint-disable-next-line no-console
-  console.error('[claude-browser-broker] fatal:', err);
-  process.exit(1);
-});
+// Only run the daemon when this module is the process entry point. Importing the
+// library barrel (scripts/install.ts, the integration harness) must NOT start a
+// server or call process.exit.
+const isEntry =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isEntry) {
+  main().catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.error('[claude-browser-broker] fatal:', err);
+    process.exit(1);
+  });
+}

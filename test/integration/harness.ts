@@ -4,7 +4,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch, type LaunchedChrome } from 'chrome-launcher';
 import { readPinnedExtensionId } from '../../scripts/lib/manifest.js';
-import { type Config } from '@claude-browser/shared';
+import { DEFAULT_PORT, type Config } from '@claude-browser/shared';
 // R1: Broker exposes an in-process server factory via `startServer` (not `createServer`).
 // R4: client + tool registration come from the mcp-server package.
 import { startServer, type BrokerServer } from '@claude-browser/broker';
@@ -52,9 +52,10 @@ export async function startHarness(): Promise<Harness> {
   const token = 'integration-test-token-0000000000000000000000000000000000000000';
 
   // R1: use startServer (canonical export from @claude-browser/broker).
-  // Use port 0 so the OS assigns a free port atomically — avoids the TOCTOU
-  // race of probing a port, releasing it, then re-binding to the same number.
-  const broker = await startServer({ port: 0, token, extensionId });
+  // Bind to DEFAULT_PORT: a freshly loaded extension has empty chrome.storage and
+  // dials DEFAULT_PORT, so the broker MUST listen there for the extension to find
+  // it (an ephemeral port would never be discovered by the extension).
+  const broker = await startServer({ port: DEFAULT_PORT, token, extensionId });
   const { port } = broker;
   const config: Config = { port, token, extensionId };
 
@@ -68,6 +69,9 @@ export async function startHarness(): Promise<Harness> {
       chromeFlags: [
         `--load-extension=${extensionDist}`,
         `--disable-extensions-except=${extensionDist}`,
+        // Chrome 137+ disabled the --load-extension switch by default; this
+        // feature flag re-enables it so the unpacked extension actually loads.
+        '--disable-features=DisableLoadExtensionCommandLineSwitch',
         '--no-first-run',
         '--no-default-browser-check',
         '--disable-gpu',

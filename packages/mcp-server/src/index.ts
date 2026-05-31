@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadConfig } from './load-config.js';
@@ -67,8 +68,15 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-main().catch((err) => {
-  // stderr only: stdout is the MCP stdio channel.
-  process.stderr.write(`claude-browser-mcp fatal: ${(err as Error).message}\n`);
-  process.exit(1);
-});
+// Only run the MCP server when this module is the process entry point. Importing
+// the library barrel (the integration harness imports createClient/registerTools)
+// must NOT start a stdio server or call process.exit.
+const isEntry =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isEntry) {
+  main().catch((err) => {
+    // stderr only: stdout is the MCP stdio channel.
+    process.stderr.write(`claude-browser-mcp fatal: ${(err as Error).message}\n`);
+    process.exit(1);
+  });
+}
