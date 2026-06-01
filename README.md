@@ -4,10 +4,10 @@
 > 用你**真实的 Chrome（带你已登录的账号）**，截图 + 坐标操作 *和* 结构化 DOM 操作，全部从终端里的 Claude Code 驱动。
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/单元测试-180%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/单元测试-206%20passing-brightgreen)
 ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-Claude%20Code-8A2BE2)
-![platform](https://img.shields.io/badge/platform-macOS-lightgrey?logo=apple&logoColor=white)
+![platform](https://img.shields.io/badge/platform-macOS%20·%20Windows%20·%20Linux-lightgrey)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
 ---
@@ -33,12 +33,12 @@
 ```mermaid
 flowchart TD
     CC["Claude Code<br/>(你的会话)"] <-->|"MCP stdio"| MCP["MCP Server<br/>browser_* 工具<br/>(每会话一个 · 临时)"]
-    MCP <-->|"WS 127.0.0.1 + token<br/>(agent 侧)"| BROKER["Broker 常驻进程<br/>路由 · 标签页租约 · 控制台缓冲<br/>(launchd KeepAlive · 始终在线)"]
+    MCP <-->|"WS 127.0.0.1 + token<br/>(agent 侧)"| BROKER["Broker<br/>路由 · 标签页租约 · 控制台缓冲<br/>(MCP 自动拉起 · detached · 跨会话存活)"]
     BROKER <-->|"WS 127.0.0.1<br/>Origin 锁定扩展 id<br/>(browser 侧)"| EXT["Chrome 扩展 (MV3)<br/>瘦 CDP 中继 +<br/>Codex 级自动重连"]
     EXT <-->|"chrome.debugger / CDP"| TABS["你真实的 Chrome 标签页<br/>(带你的登录态)"]
 ```
 
-**为什么这样就不会掉线**：Broker 是唯一的常驻锚点——它比 MCP server 活得久，所以新开 Claude 会话能在毫秒内接上；而扩展靠 alarm 自愈，比 service worker 的死亡活得久。两类「需要手动重连」的失效模式被分别根治。
+**为什么这样就不会掉线**：Broker 由 MCP server 自动拉起（detached），比拉起它的会话活得久——新开 Claude 会话能在毫秒内接上；而扩展靠 alarm 自愈，比 service worker 的死亡活得久。两类「需要手动重连」的失效模式被分别根治。
 
 ## 🔁 稳定性机制（项目的灵魂）
 
@@ -59,7 +59,7 @@ sequenceDiagram
 ```
 
 - **扩展端**：service worker 一启动就连；断开时同时启动 **5s 定时重试** *和* **`chrome.alarms`（每 30s，能在 SW 被杀后存活）**；30s 心跳 ping，丢 pong 即重建。
-- **Broker 端**：`launchd` `KeepAlive=true` 常驻；持有一条温热的扩展连接 + N 条 MCP 连接；MCP 重启时它毫发无伤。
+- **Broker 端**：由 MCP server 自动拉起（detached + unref），跨会话存活、跨平台、无需系统服务；持有温热的扩展连接 + N 条 MCP 连接；MCP 重启时它毫发无伤。
 - **MCP 端**：连不上 Broker 就把它拉起来（detached），自动重连；调用中断时返回可重试的结构化错误，绝不挂死。
 
 ## 🧰 工具（`browser_*`，全混合）
@@ -95,7 +95,7 @@ Claude Code 会用 `npx` 拉起 MCP server，broker 自动拉起（无需常驻�
 ```
 packages/
   shared/       JSON-RPC 协议契约 + 类型守卫
-  broker/       常驻守护进程：路由 / 租约 / WS 鉴权 / 心跳 / launchd
+  broker/       守护进程（MCP 自动拉起）：路由 / 租约 / WS 鉴权 / 心跳
   extension/    MV3 扩展：瘦 CDP 中继 + 自愈重连 + 光标叠层 + popup
   mcp-server/   MCP stdio 服务：browser_* 工具 / CDP 构造器 / 自愈客户端
 scripts/        一键安装 / 卸载 + 安装器辅助库
@@ -105,7 +105,7 @@ docs/superpowers/  设计规格 + 50 步实现计划
 
 ## 🧪 测试状态
 
-- **180 个单元测试全部通过**（shared 23 / broker 43 / extension 29 / mcp-server 66 + 安装器辅助库），`tsc` 类型检查与构建全绿。
+- **206 个单元测试全部通过**（shared / broker / extension / mcp-server + 安装器辅助库），`tsc` 类型检查与构建全绿；CI 在 ubuntu + windows 上跑。
 - 重连纪律（alarm + 心跳 + 重连）由 `transport.test.ts` 单测覆盖。
 - e2e / soak 测试**已写好**，但需要能加载未打包扩展的浏览器（见下方限制）。
 
@@ -113,7 +113,7 @@ docs/superpowers/  设计规格 + 50 步实现计划
 
 - **自动化 e2e/soak 测试**依赖 `--load-extension` 命令行开关。**Chrome 137+（含 148）已移除该开关**，所以自动化测试需要 *Chrome for Testing* 或更老版本；**这不影响产品本身**——扩展通过「加载已解压」正常工作（即真实使用路径）。
 - 使用 `chrome.debugger` 会出现 Chrome 自带的「正在调试此浏览器」横幅（与 Codex 一样，无法用扩展 API 隐藏）。
-- 安装器目前面向 **macOS**（broker/扩展/MCP 本身跨平台）。
+- Chrome 网上应用店一键安装仍为后续计划（当前通过「加载已解压」安装扩展）。
 
 ## 🙏 致谢
 

@@ -35,7 +35,10 @@ await esbuild.build({
 chmodSync(`${OUT}/dist/mcp.js`, 0o755);
 
 // 4. Copy the built extension.
-cpSync('packages/extension/dist', `${OUT}/extension`, { recursive: true });
+cpSync('packages/extension/dist', `${OUT}/extension`, {
+  recursive: true,
+  filter: (src) => !src.endsWith('.map') && !src.endsWith('.tsbuildinfo'),
+});
 
 // 5. package.json — version from root, deps from mcp-server.
 const root = JSON.parse(readFileSync('package.json', 'utf8'));
