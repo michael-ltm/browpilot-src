@@ -1,5 +1,6 @@
 import { type OnStatusParams } from '@claude-browser/shared';
 import { STATUS_KEY } from '../background/transport';
+import { LABEL_KEY } from '../background/config';
 
 export interface StatusView {
   color: string;
@@ -18,6 +19,11 @@ export function statusDisplay(status: OnStatusParams | undefined): StatusView {
   return view;
 }
 
+/** Pure: persist a profile label (trimmed). */
+export async function applyLabelInput(value: string): Promise<void> {
+  await chrome.storage.local.set({ [LABEL_KEY]: value.trim() });
+}
+
 async function render(): Promise<void> {
   const dot = document.getElementById('dot');
   const text = document.getElementById('label');
@@ -27,6 +33,15 @@ async function render(): Promise<void> {
   const view = statusDisplay(status);
   dot.style.background = view.color;
   text.textContent = view.label;
+
+  const labelInput = document.getElementById('cb-label') as HTMLInputElement | null;
+  if (labelInput) {
+    const g = (await chrome.storage.local.get(LABEL_KEY)) as Record<string, unknown>;
+    labelInput.value = typeof g[LABEL_KEY] === 'string' ? (g[LABEL_KEY] as string) : '';
+    labelInput.addEventListener('change', () => {
+      void applyLabelInput(labelInput.value);
+    });
+  }
 }
 
 if (typeof document !== 'undefined') {

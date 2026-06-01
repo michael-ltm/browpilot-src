@@ -20,6 +20,8 @@ const PONG_TIMEOUT_MS = 3000;
 export interface TransportOptions {
   port: number;
   extensionId: string;
+  instanceId: string;
+  label: string;
 }
 
 type RequestHandler = (params: unknown) => Promise<unknown> | unknown;
@@ -72,7 +74,7 @@ export class Transport {
     const ws = new WebSocket(`ws://127.0.0.1:${this.opts.port}`);
     this.ws = ws;
     ws.onopen = () => {
-      const hello: BrowserHello = { type: 'hello', role: 'browser', extensionId: this.opts.extensionId };
+      const hello: BrowserHello = { type: 'hello', role: 'browser', extensionId: this.opts.extensionId, instanceId: this.opts.instanceId, label: this.opts.label };
       ws.send(JSON.stringify(hello));
       void this.setStatus('connected');
       void chrome.alarms.clear(RECONNECT_ALARM);

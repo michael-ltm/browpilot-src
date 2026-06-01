@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { statusDisplay } from '../src/popup/popup';
+import { statusDisplay, applyLabelInput } from '../src/popup/popup';
+import { installChromeMock } from './chromeMock';
 
 describe('statusDisplay', () => {
   it('maps connected to a green dot', () => {
@@ -19,5 +20,14 @@ describe('statusDisplay', () => {
       color: '#f59e0b',
       label: 'Reconnecting… (broker down)',
     });
+  });
+});
+
+describe('applyLabelInput', () => {
+  it('writes the trimmed label to storage under LABEL_KEY', async () => {
+    installChromeMock();
+    await applyLabelInput('  Personal  ');
+    const got = await chrome.storage.local.get('claudeBrowserLabel');
+    expect(got.claudeBrowserLabel).toBe('Personal');
   });
 });

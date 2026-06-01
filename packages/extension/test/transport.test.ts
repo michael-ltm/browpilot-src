@@ -27,19 +27,19 @@ describe('Transport', () => {
   it('sends a BrowserHello first on open and mirrors connected status', async () => {
     const { Transport, RECONNECT_ALARM } = await loadTransport();
     expect(RECONNECT_ALARM).toBeTypeOf('string');
-    const t = new Transport({ port: 8787, extensionId: 'testextensionid' });
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     t.connect();
     const ws = FakeWebSocket.latest();
     expect(ws.url).toBe('ws://127.0.0.1:8787');
     ws.emitOpen();
     const hello = JSON.parse(ws.sent[0]);
-    expect(hello).toEqual({ type: 'hello', role: 'browser', extensionId: 'testextensionid' });
+    expect(hello).toEqual({ type: 'hello', role: 'browser', extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     expect(mock.storage.claudeBrowserStatus).toMatchObject({ state: 'connected' });
   });
 
   it('correlates request ids and resolves with the result', async () => {
     const { Transport } = await loadTransport();
-    const t = new Transport({ port: 8787, extensionId: 'testextensionid' });
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     t.connect();
     const ws = FakeWebSocket.latest();
     ws.emitOpen();
@@ -53,7 +53,7 @@ describe('Transport', () => {
 
   it('rejects a request when an error response arrives', async () => {
     const { Transport } = await loadTransport();
-    const t = new Transport({ port: 8787, extensionId: 'testextensionid' });
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     t.connect();
     const ws = FakeWebSocket.latest();
     ws.emitOpen();
@@ -65,7 +65,7 @@ describe('Transport', () => {
 
   it('dispatches inbound requests to registered handlers and replies with success', async () => {
     const { Transport } = await loadTransport();
-    const t = new Transport({ port: 8787, extensionId: 'testextensionid' });
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     t.registerHandler('getTabs', async () => ({ tabs: [{ id: 1 }] }));
     t.connect();
     const ws = FakeWebSocket.latest();
@@ -80,7 +80,7 @@ describe('Transport', () => {
 
   it('replies with a JSON-RPC error when a handler throws', async () => {
     const { Transport } = await loadTransport();
-    const t = new Transport({ port: 8787, extensionId: 'testextensionid' });
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     t.registerHandler('getTabs', async () => {
       throw { code: ErrorCode.CDP_ERROR, message: 'nope' };
     });
@@ -97,7 +97,7 @@ describe('Transport', () => {
 
   it('rejects all pending and schedules BOTH a setTimeout and an alarm on close', async () => {
     const { Transport, RECONNECT_ALARM } = await loadTransport();
-    const t = new Transport({ port: 8787, extensionId: 'testextensionid' });
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     t.connect();
     const ws = FakeWebSocket.latest();
     ws.emitOpen();
@@ -115,7 +115,7 @@ describe('Transport', () => {
 
   it('sends a heartbeat ping at 30s and forces reconnect when no pong in 3s', async () => {
     const { Transport } = await loadTransport();
-    const t = new Transport({ port: 8787, extensionId: 'testextensionid' });
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     t.connect();
     const ws = FakeWebSocket.latest();
     ws.emitOpen();
@@ -131,7 +131,7 @@ describe('Transport', () => {
 
   it('does not force reconnect when a pong arrives in time', async () => {
     const { Transport } = await loadTransport();
-    const t = new Transport({ port: 8787, extensionId: 'testextensionid' });
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
     t.connect();
     const ws = FakeWebSocket.latest();
     ws.emitOpen();

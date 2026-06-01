@@ -11,7 +11,7 @@ import {
 import { Transport, RECONNECT_ALARM } from './transport';
 import { handleExecuteCdp, attach, detach, registerCdpEventForwarding, registerAutoReattach } from './relay';
 import { getTabs, newTab, switchTab, closeTab, getHistory } from './helpers';
-import { resolvePort, resolveExtensionId } from './config';
+import { resolvePort, resolveExtensionId, getInstanceId, getLabel } from './config';
 
 /** Pure wiring: register handlers, event forwarding, alarm reconnect, eager connect. */
 export function bootstrap(transport: Transport): void {
@@ -48,7 +48,9 @@ export function bootstrap(transport: Transport): void {
 async function main(): Promise<void> {
   const port = await resolvePort();
   const extensionId = resolveExtensionId();
-  const transport = new Transport({ port, extensionId });
+  const instanceId = await getInstanceId();
+  const label = await getLabel(instanceId);
+  const transport = new Transport({ port, extensionId, instanceId, label });
   bootstrap(transport);
 }
 
