@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadConfig } from './load-config.js';
+import { ensureConfig } from './bootstrap.js';
 import { BrokerClient } from './client.js';
 import { createContext } from './context.js';
 import { registerAll } from './tools/index.js';
@@ -75,6 +76,10 @@ export function resolveExtensionDir(here: string, exists: (p: string) => boolean
 }
 
 async function main(): Promise<void> {
+  // First-run bootstrap (npx flow): write ~/.claude-browser/config.json if absent,
+  // deriving extensionId from the bundled extension manifest. No-op if it exists.
+  const here = dirname(fileURLToPath(import.meta.url));
+  ensureConfig(resolveExtensionDir(here));
   const config = loadConfig();
 
   const client = new BrokerClient({
@@ -117,7 +122,13 @@ if (isEntry) {
     const r = spawnSync('claude', ['mcp', 'add', 'claude-browser', '--', 'npx', '-y', 'claude-browser'], { stdio: 'inherit' });
     process.exit(r.status ?? 0);
   } else if (cmd.kind === 'version') {
-    process.stdout.write('claude-browser ' + process.env.npm_package_version + '\n');
+    let v = '0.0.0';
+    try {
+      v = (JSON.parse(readFileSync(resolvePath(here, '../package.json'), 'utf8')) as { version?: string }).version ?? v;
+    } catch {
+      /* fall back to default */
+    }
+    process.stdout.write('claude-browser ' + v + '\n');
   } else {
     process.stdout.write(
       'Usage:\n  claude-browser                run the MCP server (used by Claude Code)\n' +
