@@ -73,19 +73,22 @@ sequenceDiagram
 
 > **「比 chrome-mcp 好用」的关键**：截图 + 带 `[refN]` 句柄的快照配合使用——Claude 既能*看见*页面，又能拿到*可靠的元素句柄*，比纯坐标（Codex）和纯 DOM（chrome-mcp）都更稳。
 
-## 🚀 安装与使用（macOS）
+## 安装与使用（macOS / Windows / Linux）
 
+**1. 注册 MCP（免 clone，一行命令）:**
 ```bash
-git clone <this-repo-url> claude-browser && cd claude-browser
-npm install && npm run build
-npm run install:browser   # 写入 ~/.claude-browser/config.json，启动 launchd broker，并运行 `claude mcp add`
+claude mcp add claude-browser -- npx -y claude-browser
 ```
+Claude Code 会用 `npx` 拉起 MCP server，broker 自动拉起（无需常驻服务，跨平台）。
 
-然后在 Chrome 里加载扩展：**`chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选 `packages/extension/dist`**（确认扩展 id 与 config 一致）。
+**2. 加载扩展:**
+- 下载 [最新 Release](https://github.com/michael-ltm/claude-browser/releases) 里的 `claude-browser-extension-*.zip` 并解压；或运行 `npx claude-browser extension-path` 打印已打包的扩展目录。
+- 打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选该目录。
+- 点开扩展 popup 给这个 profile 起名（默认自动用你的 Google 邮箱名）。
 
-打开一个 Claude Code 会话——`/mcp` 里就能看到 `claude-browser` 的 `browser_*` 工具；扩展会连上 8787 端口的 broker，并靠 alarm 保活，**理论上你再也不用手动重连**。
+**3. 用:** 打开 Claude Code 会话，`/mcp` 里能看到 `browser_*` 工具，直接让它操作浏览器。
 
-卸载：`npm run uninstall:browser`。
+> Chrome 网上应用店一键安装为后续计划。开发者本地开发用 `npm run install:browser`（注册本地构建，不装常驻进程）。
 
 ## 🗂️ 项目结构
 

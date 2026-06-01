@@ -1,12 +1,9 @@
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { writeFile } from 'node:fs/promises';
 import { resolvePaths } from './lib/paths.js';
-import { readPinnedExtensionId } from './lib/manifest.js';
 import { ensureConfig } from './lib/ensure-config.js';
 import { run } from './lib/run.js';
-import { renderLaunchdPlist } from '@claude-browser/broker';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(here, '..');
@@ -16,31 +13,13 @@ function log(msg: string): void {
 }
 
 async function main(): Promise<void> {
+  console.log('Dev install: registered local build. End users: claude mcp add claude-browser -- npx -y claude-browser');
+
   const paths = resolvePaths(REPO_ROOT, homedir());
 
-  log('Building all packages...');
-  await run('npm', ['run', 'build'], { cwd: REPO_ROOT });
-
-  log('Deriving pinned extension id from built manifest...');
-  const extensionId = await readPinnedExtensionId(paths.extensionDist);
-  log(`Pinned extension id: ${extensionId}`);
-
   log(`Ensuring config at ${paths.configFile}...`);
-  const { created, config } = await ensureConfig(paths.configFile, extensionId);
-  log(created ? `Created new config (port ${config.port}).` : `Updated existing config (port ${config.port}, token preserved).`);
-
-  log('Rendering launchd plist...');
-  const plist = renderLaunchdPlist({
-    nodePath: process.execPath,
-    scriptPath: paths.brokerEntry,
-  });
-  await writeFile(paths.plistPath, plist, 'utf8');
-  log(`Wrote ${paths.plistPath}`);
-
-  // Unload any previous instance (ignore failure on first install), then load.
-  await run('launchctl', ['unload', paths.plistPath], { allowFailure: true });
-  await run('launchctl', ['load', paths.plistPath]);
-  log('Broker launchd agent loaded (KeepAlive, RunAtLoad).');
+  const { created, config } = await ensureConfig(paths.configFile, '');
+  log(created ? `Created new config (port ${config.port}).` : `Config already exists (port ${config.port}).`);
 
   log('Registering MCP server with Claude Code...');
   // Remove any stale registration first so re-installs are idempotent.
@@ -52,19 +31,8 @@ async function main(): Promise<void> {
     [
       '',
       '============================================================',
-      ' Almost done — load the Chrome extension (one-time, manual):',
-      '============================================================',
-      ' 1. Open chrome://extensions',
-      ' 2. Enable "Developer mode" (top-right toggle)',
-      ' 3. Click "Load unpacked" and select:',
+      ' Dev install complete. Load the extension from:',
       `      ${paths.extensionDist}`,
-      ' 4. Confirm the loaded extension ID equals:',
-      `      ${extensionId}`,
-      '    (If it differs, the broker will reject it — rebuild the',
-      '     extension and re-run install.)',
-      '',
-      ' The broker is now running and will stay up across reboots.',
-      ' Start a new Claude Code session to use the browser_* tools.',
       '============================================================',
       '',
     ].join('\n'),
