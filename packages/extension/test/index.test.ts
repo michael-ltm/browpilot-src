@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { installChromeMock, type ChromeMock } from './chromeMock';
+import { installChromeMock, installFakeWebSocket, type ChromeMock } from './chromeMock';
 import { Method } from '@claude-browser/shared';
 import { RECONNECT_ALARM } from '../src/background/transport';
 
@@ -7,6 +7,10 @@ let mock: ChromeMock;
 
 beforeEach(() => {
   mock = installChromeMock();
+  // Importing src/background/index runs its top-level `void main()`, which calls
+  // transport.connect() -> `new WebSocket(...)`. Node 20 has no global WebSocket
+  // (Node 22 does), so install the fake first to avoid a ReferenceError in CI.
+  installFakeWebSocket();
 });
 afterEach(() => {
   vi.restoreAllMocks();
