@@ -34,16 +34,20 @@ export function execCdp<R = unknown>(
   ctx: ToolContext,
   tabId: number,
   cmd: CdpCommand,
-  timeoutMs?: number,
+  opts?: { browserId?: string; timeoutMs?: number },
 ): Promise<R> {
   const target: CdpTarget = { tabId };
+  // Route to the explicit profile, else the session-selected one, else let the
+  // broker pick the sole connected profile (or return AMBIGUOUS_PROFILE).
+  const browserId = opts?.browserId ?? ctx.selectedBrowserId ?? undefined;
   const params: ExecuteCdpParams = {
     target,
     method: cmd.method,
     params: cmd.params,
-    timeoutMs,
+    timeoutMs: opts?.timeoutMs,
+    ...(browserId ? { browserId } : {}),
   };
-  return ctx.client.request<R>(Method.EXECUTE_CDP, params, timeoutMs);
+  return ctx.client.request<R>(Method.EXECUTE_CDP, params, opts?.timeoutMs);
 }
 
 /** Run an ordered list of CDP commands sequentially. */
@@ -51,8 +55,9 @@ export async function execCdpSeq(
   ctx: ToolContext,
   tabId: number,
   cmds: CdpCommand[],
+  opts?: { browserId?: string },
 ): Promise<void> {
-  for (const cmd of cmds) await execCdp(ctx, tabId, cmd);
+  for (const cmd of cmds) await execCdp(ctx, tabId, cmd, opts);
 }
 
 /** Plain text result. */

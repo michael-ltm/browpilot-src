@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Method, type GetConsoleParams, type GetConsoleResult } from '@claude-browser/shared';
 import { defineTool, textResult, type ToolDef, type ToolResult } from './types.js';
+import { profileParam } from '../context.js';
 
 const browser_console = defineTool({
   name: 'browser_console',
@@ -9,9 +10,10 @@ const browser_console = defineTool({
     tabId: z.number().int().optional(),
     filter: z.string().optional(),
     since: z.number().optional(),
+    profile: z.string().optional(),
   },
-  async handler({ tabId, filter, since }, ctx): Promise<ToolResult> {
-    const params: GetConsoleParams = { tabId, filter, since };
+  async handler({ tabId, filter, since, profile }, ctx): Promise<ToolResult> {
+    const params: GetConsoleParams = { tabId, filter, since, ...profileParam(ctx, profile) };
     const res = await ctx.client.request<GetConsoleResult>(Method.GET_CONSOLE, params);
     const lines = res.entries.map(
       (e) => `[${new Date(e.timestamp).toISOString()}] ${e.level} (tab ${e.tabId}): ${e.text}`,
