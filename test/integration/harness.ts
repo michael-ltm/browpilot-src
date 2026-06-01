@@ -4,7 +4,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch, type LaunchedChrome } from 'chrome-launcher';
 import { readPinnedExtensionId } from '../../scripts/lib/manifest.js';
-import { DEFAULT_PORT, type Config } from '@claude-browser/shared';
+import { DEFAULT_PORT, Method, type Config } from '@claude-browser/shared';
 // R1: Broker exposes an in-process server factory via `startServer` (not `createServer`).
 // R4: client + tool registration come from the mcp-server package.
 import { startServer, type BrokerServer } from '@claude-browser/broker';
@@ -185,4 +185,102 @@ function waitForExtension(broker: BrokerServer, timeoutMs: number): Promise<void
     };
     broker.onBrowserConnected(onConnect);
   });
+}
+
+// ── Two-profile harness ─────────────────────────────────────────────────────
+
+interface ProfileSummary { browserId: string; label: string; status: string }
+
+export interface TwoProfileHarness {
+  broker: BrokerServer;
+  client: BrokerClient;
+  callTool(name: string, args: Record<string, unknown>): Promise<ToolResult>;
+  listProfiles(): Promise<ProfileSummary[]>;
+  teardown(): Promise<void>;
+}
+
+function launchChrome(userDataDir: string): Promise<LaunchedChrome> {
+  return launch({
+    chromeFlags: [
+      `--load-extension=${extensionDist}`,
+      `--disable-extensions-except=${extensionDist}`,
+      '--disable-features=DisableLoadExtensionCommandLineSwitch',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-gpu',
+      '--disable-background-timer-throttling',
+    ],
+    userDataDir,
+    ignoreDefaultFlags: false,
+  });
+}
+
+async function waitForProfiles(broker: BrokerServer, count: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (broker.router.connectedBrowserIds().length >= count) return;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `only ${broker.router.connectedBrowserIds().length}/${count} profiles connected within ${timeoutMs}ms`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
+/**
+ * Launch ONE broker + TWO Chrome instances (distinct user-data-dirs → distinct
+ * instanceIds) + one agent client, so tests can list/select/route across profiles.
+ */
+export async function startTwoProfileHarness(): Promise<TwoProfileHarness> {
+  const tmpRoot = await mkdtemp(join(tmpdir(), 'cb-harness-2p-'));
+  const dirA = join(tmpRoot, 'profile-a');
+  const dirB = join(tmpRoot, 'profile-b');
+  await mkdir(dirA, { recursive: true });
+  await mkdir(dirB, { recursive: true });
+
+  const extensionId = await readPinnedExtensionId(extensionDist);
+  const token = 'integration-test-token-0000000000000000000000000000000000000000';
+  const broker = await startServer({ port: DEFAULT_PORT, token, extensionId });
+  const { port } = broker;
+
+  const chromes: LaunchedChrome[] = [];
+  let client: BrokerClient | undefined;
+  try {
+    chromes.push(await launchChrome(dirA));
+    chromes.push(await launchChrome(dirB));
+
+    const tools = new Map<string, (args: Record<string, unknown>) => Promise<ToolResult>>();
+    client = await createClient({ port, token });
+    registerInto(tools, client);
+
+    await waitForProfiles(broker, 2, 20_000);
+    const liveClient = client;
+
+    return {
+      broker,
+      client: liveClient,
+      async callTool(name, args) {
+        const fn = tools.get(name);
+        if (!fn) throw new Error(`tool not registered: ${name}`);
+        return fn(args);
+      },
+      async listProfiles() {
+        const res = await liveClient.request<{ profiles: ProfileSummary[] }>(Method.LIST_PROFILES, {});
+        return res.profiles;
+      },
+      async teardown() {
+        try { liveClient.close(); } catch { /* ignore */ }
+        try { await broker.close(); } catch { /* ignore */ }
+        for (const c of chromes) { try { c.kill(); } catch { /* ignore */ } }
+        try { await rm(tmpRoot, { recursive: true, force: true }); } catch { /* ignore */ }
+      },
+    };
+  } catch (err) {
+    client?.close();
+    for (const c of chromes) { try { c.kill(); } catch { /* ignore */ } }
+    await broker.close().catch(() => undefined);
+    await rm(tmpRoot, { recursive: true, force: true });
+    throw err;
+  }
 }
