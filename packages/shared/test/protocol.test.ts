@@ -28,6 +28,9 @@ describe('Method constant wire values', () => {
       DETACH: 'detach',
       GET_CONSOLE: 'getConsole',
       PING: 'ping',
+      LIST_PROFILES: 'listProfiles',
+      GET_PROFILE_STATUS: 'getProfileStatus',
+      GET_PROFILE_LOGS: 'getProfileLogs',
     });
   });
 });
@@ -38,6 +41,7 @@ describe('Notif constant wire values', () => {
       ON_CDP_EVENT: 'onCDPEvent',
       ON_CONSOLE: 'onConsole',
       ON_STATUS: 'onStatus',
+      ON_PROFILE_CHANGE: 'onProfileChange',
     });
   });
 });
@@ -59,6 +63,7 @@ describe('ErrorCode constant values', () => {
     expect(ErrorCode.LEASE_DENIED).toBe(1005);
     expect(ErrorCode.TIMEOUT).toBe(1006);
     expect(ErrorCode.UNAUTHORIZED).toBe(1007);
+    expect(ErrorCode.AMBIGUOUS_PROFILE).toBe(1008);
   });
 });
 
@@ -170,5 +175,15 @@ describe('isJsonRpcMessage', () => {
     expect(isJsonRpcMessage({ jsonrpc: '2.0' })).toBe(false);
     expect(isJsonRpcMessage({ jsonrpc: '2.0', id: 1 })).toBe(false);
     expect(isJsonRpcMessage(null)).toBe(false);
+  });
+});
+
+describe('multi-profile contract', () => {
+  it('adds profile methods, notif, and error code', () => {
+    expect(Method.LIST_PROFILES).toBe('listProfiles');
+    expect(Method.GET_PROFILE_STATUS).toBe('getProfileStatus');
+    expect(Method.GET_PROFILE_LOGS).toBe('getProfileLogs');
+    expect(Notif.ON_PROFILE_CHANGE).toBe('onProfileChange');
+    expect(ErrorCode.AMBIGUOUS_PROFILE).toBe(1008);
   });
 });
