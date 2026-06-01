@@ -40,9 +40,18 @@ cpSync('packages/extension/dist', `${OUT}/extension`, { recursive: true });
 // 5. package.json — version from root, deps from mcp-server.
 const root = JSON.parse(readFileSync('package.json', 'utf8'));
 const mcpPkg = JSON.parse(readFileSync('packages/mcp-server/package.json', 'utf8'));
+// Filter out workspace-internal packages (version "*" or "@claude-browser/" scope):
+// esbuild inlines them, so they are not runtime deps of the published package.
+// Leaving them in would cause `npm install claude-browser` to fail because those
+// packages are private and never published to npm.
+const publishDeps = Object.fromEntries(
+  Object.entries(mcpPkg.dependencies ?? {}).filter(
+    ([name, ver]) => ver !== '*' && !name.startsWith('@claude-browser/'),
+  ),
+);
 writeFileSync(
   `${OUT}/package.json`,
-  JSON.stringify(makePackageManifest(root.version, mcpPkg.dependencies), null, 2) + '\n',
+  JSON.stringify(makePackageManifest(root.version, publishDeps), null, 2) + '\n',
 );
 // 6. README for the npm page.
 writeFileSync(`${OUT}/README.md`, '# claude-browser\n\nInstall: `claude mcp add claude-browser -- npx -y claude-browser`\n\nThen load the unpacked extension printed by `npx claude-browser extension-path`. See https://github.com/michael-ltm/claude-browser\n');
