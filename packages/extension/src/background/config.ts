@@ -26,10 +26,26 @@ export async function getInstanceId(): Promise<string> {
   return id;
 }
 
-/** User-editable display label; defaults to `Profile <first4 of instanceId>`. */
+/** The signed-in Google account's email local-part, or null if unavailable. */
+export async function getProfileEmailName(): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' as chrome.identity.AccountStatus }, (info) => {
+        const email = info?.email ?? '';
+        resolve(email ? email.split('@')[0]! || email : null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/** Resolution order: explicit custom label -> Google email local-part -> Profile <shortId>. */
 export async function getLabel(instanceId: string): Promise<string> {
-  const got = await chrome.storage.local.get(LABEL_KEY);
-  const v = (got as Record<string, unknown>)[LABEL_KEY];
-  if (typeof v === 'string' && v.length > 0) return v;
+  const got = (await chrome.storage.local.get(LABEL_KEY)) as Record<string, unknown>;
+  const v = got[LABEL_KEY];
+  if (typeof v === 'string' && v.trim().length > 0) return v.trim();
+  const email = await getProfileEmailName();
+  if (email) return email;
   return `Profile ${instanceId.slice(0, 4)}`;
 }

@@ -23,7 +23,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["debugger", "tabs", "history", "alarms", "scripting", "storage"],
+  "permissions": ["debugger", "tabs", "history", "alarms", "scripting", "storage", "identity", "identity.email"],
   "host_permissions": ["<all_urls>"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' ws://127.0.0.1:*;"
