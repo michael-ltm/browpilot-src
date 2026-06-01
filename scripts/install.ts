@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { resolvePaths } from './lib/paths.js';
 import { ensureConfig } from './lib/ensure-config.js';
+import { readPinnedExtensionId } from './lib/manifest.js';
 import { run } from './lib/run.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -18,7 +19,8 @@ async function main(): Promise<void> {
   const paths = resolvePaths(REPO_ROOT, homedir());
 
   log(`Ensuring config at ${paths.configFile}...`);
-  const { created, config } = await ensureConfig(paths.configFile, '');
+  const extensionId = await readPinnedExtensionId(paths.extensionDist);
+  const { created, config } = await ensureConfig(paths.configFile, extensionId);
   log(created ? `Created new config (port ${config.port}).` : `Config already exists (port ${config.port}).`);
 
   log('Registering MCP server with Claude Code...');
