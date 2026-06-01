@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
+import { existsSync } from 'node:fs';
+import { dirname, resolve as resolvePath } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadConfig } from './load-config.js';
@@ -46,6 +49,31 @@ export function registerTools(server: McpToolRegistrar, client: BrokerClient): v
   registerAll(server as McpServer, makeToolContext(client));
 }
 
+export type CliCommand =
+  | { kind: 'mcp' }
+  | { kind: 'extension-path' }
+  | { kind: 'install' }
+  | { kind: 'version' }
+  | { kind: 'help' };
+
+export function parseCli(args: string[]): CliCommand {
+  const a = args[0];
+  if (a === undefined) return { kind: 'mcp' };
+  if (a === 'extension-path') return { kind: 'extension-path' };
+  if (a === 'install') return { kind: 'install' };
+  if (a === '--version' || a === '-v') return { kind: 'version' };
+  return { kind: 'help' };
+}
+
+/** Locate the bundled extension dir in packaged (../extension) and dev (../../extension/dist) layouts. */
+export function resolveExtensionDir(here: string, exists: (p: string) => boolean = existsSync): string | null {
+  const packaged = resolvePath(here, '../extension');         // published: dist/mcp.js -> ../extension
+  if (exists(resolvePath(packaged, 'manifest.json'))) return packaged;
+  const dev = resolvePath(here, '../../extension/dist');      // monorepo dev
+  if (exists(resolvePath(dev, 'manifest.json'))) return dev;
+  return null;
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
 
@@ -74,9 +102,27 @@ async function main(): Promise<void> {
 const isEntry =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isEntry) {
-  main().catch((err) => {
-    // stderr only: stdout is the MCP stdio channel.
-    process.stderr.write(`claude-browser-mcp fatal: ${(err as Error).message}\n`);
-    process.exit(1);
-  });
+  const cmd = parseCli(process.argv.slice(2));
+  const here = dirname(fileURLToPath(import.meta.url));
+  if (cmd.kind === 'mcp') {
+    main().catch((err) => {
+      process.stderr.write(`claude-browser-mcp fatal: ${(err as Error).message}\n`);
+      process.exit(1);
+    });
+  } else if (cmd.kind === 'extension-path') {
+    const dir = resolveExtensionDir(here);
+    if (dir) process.stdout.write(dir + '\n');
+    else { process.stderr.write('extension dir not found\n'); process.exit(1); }
+  } else if (cmd.kind === 'install') {
+    const r = spawnSync('claude', ['mcp', 'add', 'claude-browser', '--', 'npx', '-y', 'claude-browser'], { stdio: 'inherit' });
+    process.exit(r.status ?? 0);
+  } else if (cmd.kind === 'version') {
+    process.stdout.write('claude-browser ' + process.env.npm_package_version + '\n');
+  } else {
+    process.stdout.write(
+      'Usage:\n  claude-browser                run the MCP server (used by Claude Code)\n' +
+      '  claude-browser install        register with Claude Code (claude mcp add)\n' +
+      '  claude-browser extension-path print the bundled extension dir to load unpacked\n',
+    );
+  }
 }
