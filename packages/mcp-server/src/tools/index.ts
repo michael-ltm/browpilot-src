@@ -6,6 +6,7 @@ import { domTools } from './dom.js';
 import { navigationTools } from './navigation.js';
 import { tabsTools } from './tabs.js';
 import { consoleTools } from './console.js';
+import { profileTools } from './profiles.js';
 
 /** Every v1 browser_* tool, in a stable order. */
 export const allTools: ToolDef[] = [
@@ -14,6 +15,7 @@ export const allTools: ToolDef[] = [
   ...navigationTools,
   ...tabsTools,
   ...consoleTools,
+  ...profileTools,
 ];
 
 /** Register all tools on an McpServer, threading the shared ToolContext. */
