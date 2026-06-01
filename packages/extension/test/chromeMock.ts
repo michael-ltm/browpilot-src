@@ -62,6 +62,8 @@ export interface ChromeMock {
   chrome: typeof chrome;
   alarms: FakeAlarms;
   storage: Record<string, unknown>;
+  /** Email returned by chrome.identity.getProfileUserInfo (''=signed out). */
+  identityEmail: string;
   debuggerEvents: Array<(source: chrome.debugger.Debuggee, method: string, params?: object) => void>;
   detachListeners: Array<(source: chrome.debugger.Debuggee, reason: string) => void>;
   /** queued sendCommand resolutions keyed by method */
@@ -86,6 +88,7 @@ export function installChromeMock(): ChromeMock {
   const mock: ChromeMock = {
     alarms,
     storage,
+    identityEmail: '',
     debuggerEvents,
     detachListeners,
     sendCommandImpl: async () => ({}),
@@ -146,6 +149,20 @@ export function installChromeMock(): ChromeMock {
     },
     history: {
       search: vi.fn(() => Promise.resolve([] as chrome.history.HistoryItem[])),
+    },
+    identity: {
+      getProfileUserInfo: vi.fn(
+        (
+          detailsOrCb: unknown,
+          maybeCb?: (info: { email: string; id: string }) => void,
+        ) => {
+          const cb = (typeof detailsOrCb === 'function' ? detailsOrCb : maybeCb) as (info: {
+            email: string;
+            id: string;
+          }) => void;
+          cb({ email: mock.identityEmail, id: mock.identityEmail ? 'gaia-test-id' : '' });
+        },
+      ),
     },
     scripting: {
       executeScript: vi.fn(() => Promise.resolve([])),
