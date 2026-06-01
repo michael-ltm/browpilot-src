@@ -86,4 +86,12 @@ describe('Router multi-browser routing', () => {
     const note = t.agentSends.find((m) => 'method' in m && m.method === Notif.ON_CDP_EVENT) as any;
     expect(note.params.browserId).toBe('a');
   });
+
+  it('reports tabCount from active leases via the registry', async () => {
+    const t = setup(); t.connectBrowser('a');
+    const p = t.router.routeRequest('s1', { jsonrpc: '2.0', id: 30, method: Method.ATTACH, params: { tabId: 7, browserId: 'a' } });
+    t.router.handleBrowserMessage('a', { jsonrpc: '2.0', id: t.lastFwd('a').id, result: {} });
+    await p;
+    expect(t.registry.get('a')!.tabCount).toBe(1);
+  });
 });

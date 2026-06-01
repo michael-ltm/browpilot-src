@@ -28,12 +28,13 @@ const browser_select_profile = defineTool({
   description: 'Select which connected profile this session drives, by browserId or label. Remembered for the rest of the session.',
   inputSchema: { browserId: z.string().optional(), label: z.string().optional() },
   async handler({ browserId, label }, ctx): Promise<ToolResult> {
+    const res = await ctx.client.request<ListProfilesResult>(Method.LIST_PROFILES, {});
     let resolved = browserId;
-    if (!resolved && label) {
-      const res = await ctx.client.request<ListProfilesResult>(Method.LIST_PROFILES, {});
-      resolved = res.profiles.find((p) => p.label === label)?.browserId;
+    if (!resolved && label) resolved = res.profiles.find((p) => p.label === label)?.browserId;
+    const connected = resolved !== undefined && res.profiles.some((p) => p.browserId === resolved);
+    if (!resolved || !connected) {
+      return { ...textResult(`no connected profile matched ${browserId ?? label ?? '(nothing)'}`), isError: true };
     }
-    if (!resolved) return { ...textResult(`no profile matched ${browserId ?? label ?? '(nothing)'}`), isError: true };
     ctx.selectedBrowserId = resolved;
     return textResult(`selected profile ${resolved}`);
   },

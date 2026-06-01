@@ -150,6 +150,19 @@ describe('broker server', () => {
     void b1;
   });
 
+  it('keeps a profile routable after a same-instanceId reconnect (stale close must not deregister)', async () => {
+    server = await startServer(config);
+    await connectBrowser(server, 'rc', 'RC');
+    await new Promise((r) => setTimeout(r, 40));
+    const b2 = await connectBrowser(server, 'rc', 'RC'); // same instanceId -> replaces the socket
+    await new Promise((r) => setTimeout(r, 80)); // let the stale socket's async close fire
+    expect(server.router.connectedBrowserIds()).toEqual(['rc']);
+    const agent = await connectAgent(server, 'secret-token', 'sess-rc');
+    agent.send(JSON.stringify({ jsonrpc: '2.0', id: 3, method: Method.GET_TABS, params: { browserId: 'rc' } }));
+    const fwd = await once<JsonRpcRequest>(b2);
+    expect(fwd.method).toBe(Method.GET_TABS);
+  });
+
   it('terminates a link that fails to pong within a heartbeat tick', async () => {
     server = await startServer(config, { heartbeatMs: 60 });
     const agent = await connectAgent(server, 'secret-token', 'sess-hb');

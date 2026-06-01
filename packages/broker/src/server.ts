@@ -103,7 +103,11 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
         browsers.set(browserId, ws);
         registry.connected(browserId, hello.label);
         attachBrowser(ws, browserId, router, () => {
-          if (browsers.get(browserId) === ws) browsers.delete(browserId);
+          if (browsers.get(browserId) === ws) {
+            browsers.delete(browserId);
+            return true;
+          }
+          return false;
         });
         router.announceProfileChange(browserId);
         for (const cb of browserConnectedCallbacks) cb();
@@ -172,7 +176,7 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
   });
 }
 
-function attachBrowser(ws: LiveSocket, browserId: string, router: Router, onClose: () => void): void {
+function attachBrowser(ws: LiveSocket, browserId: string, router: Router, onClose: () => boolean): void {
   router.registerBrowser(browserId, (msg: JsonRpcMessage) => ws.send(JSON.stringify(msg)));
   ws.on('message', (data: RawData) => {
     let msg: JsonRpcMessage;
@@ -184,8 +188,10 @@ function attachBrowser(ws: LiveSocket, browserId: string, router: Router, onClos
     router.handleBrowserMessage(browserId, msg);
   });
   ws.on('close', () => {
-    onClose();
-    router.onBrowserDisconnect(browserId);
+    // A same-instanceId reconnect replaces this socket synchronously; the stale
+    // socket's async close must NOT tear down the new registration. Only run the
+    // router disconnect when this ws is still the live socket for the profile.
+    if (onClose()) router.onBrowserDisconnect(browserId);
   });
 }
 
