@@ -1,6 +1,7 @@
 import { type OnStatusParams } from '@claude-browser/shared';
 import { STATUS_KEY } from '../background/transport';
 import { LABEL_KEY } from '../background/config';
+import { getInstanceId, getLabel } from '../background/config';
 
 export interface StatusView {
   color: string;
@@ -25,19 +26,25 @@ export async function applyLabelInput(value: string): Promise<void> {
 }
 
 async function render(): Promise<void> {
+  const versionEl = document.getElementById('version');
+  if (versionEl) versionEl.textContent = `v${chrome.runtime.getManifest().version}`;
+
   const dot = document.getElementById('dot');
   const text = document.getElementById('label');
-  if (!dot || !text) return;
-  const got = await chrome.storage.local.get(STATUS_KEY);
-  const status = (got as Record<string, unknown>)[STATUS_KEY] as OnStatusParams | undefined;
-  const view = statusDisplay(status);
-  dot.style.background = view.color;
-  text.textContent = view.label;
+  if (dot && text) {
+    const got = await chrome.storage.local.get(STATUS_KEY);
+    const status = (got as Record<string, unknown>)[STATUS_KEY] as
+      | import('@claude-browser/shared').OnStatusParams
+      | undefined;
+    const view = statusDisplay(status);
+    dot.style.background = view.color;
+    text.textContent = view.label;
+  }
 
   const labelInput = document.getElementById('cb-label') as HTMLInputElement | null;
   if (labelInput) {
-    const g = (await chrome.storage.local.get(LABEL_KEY)) as Record<string, unknown>;
-    labelInput.value = typeof g[LABEL_KEY] === 'string' ? (g[LABEL_KEY] as string) : '';
+    // Prefill with the resolved name (custom > email > Profile<short>).
+    labelInput.value = await getLabel(await getInstanceId());
     labelInput.addEventListener('change', () => {
       void applyLabelInput(labelInput.value);
     });
