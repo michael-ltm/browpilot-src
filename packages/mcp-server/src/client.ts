@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve as resolvePath } from 'node:path';
 import {
@@ -54,15 +55,23 @@ interface Pending {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
-/** Spawn the broker bin detached so it outlives this MCP process. */
+/** Locate the broker entry in both the packaged (co-located) and dev (monorepo) layouts. */
+export function resolveBrokerEntry(here: string, exists: (p: string) => boolean = existsSync): string {
+  const packaged = resolvePath(here, 'broker.js'); // published: dist/mcp.js + dist/broker.js
+  if (exists(packaged)) return packaged;
+  const dev = resolvePath(here, '../../broker/dist/index.js'); // monorepo dev
+  if (exists(dev)) return dev;
+  throw new Error(`broker entry not found (looked at ${packaged} and ${dev})`);
+}
+
+/** Spawn the broker bin detached so it outlives this MCP process (cross-platform). */
 function defaultSpawnBroker(): void {
-  // The broker bin is published as @claude-browser/broker; resolve its dist entry
-  // inside the @claude-browser scope (workspace or node_modules).
   const here = dirname(fileURLToPath(import.meta.url));
-  const brokerEntry = resolvePath(here, '../../broker/dist/index.js');
+  const brokerEntry = resolveBrokerEntry(here);
   const child = spawn(process.execPath, [brokerEntry], {
     detached: true,
     stdio: 'ignore',
+    windowsHide: true, // no console flash on Windows
   });
   child.unref();
 }
