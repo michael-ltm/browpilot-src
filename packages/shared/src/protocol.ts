@@ -30,6 +30,7 @@ export type ExecuteCdpResult = unknown;
 export interface AttachParams { tabId: number; browserId?: string; }
 export interface DetachParams { tabId: number; browserId?: string; }
 export interface TabInfo { id: number; url?: string; title?: string; active?: boolean; windowId?: number; }
+export interface GetTabsParams { browserId?: string; }
 export interface GetTabsResult { tabs: TabInfo[]; }
 export interface NewTabParams { url?: string; browserId?: string; }
 export type NewTabResult = TabInfo;
