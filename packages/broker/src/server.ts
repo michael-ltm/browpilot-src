@@ -6,15 +6,15 @@ import {
   type JsonRpcMessage,
   type JsonRpcRequest,
 } from '@claude-browser/shared';
-import { ConsoleBuffer } from './buffer.js';
 import { Router } from './router.js';
+import { ProfileRegistry } from './profiles.js';
 
 const HOST = '127.0.0.1';
 const DEFAULT_HEARTBEAT_MS = 30_000;
 
 export interface ServerDeps {
-  buffer?: ConsoleBuffer;
   router?: Router;
+  registry?: ProfileRegistry;
   heartbeatMs?: number;
 }
 
@@ -36,6 +36,7 @@ interface LiveSocket extends WebSocket {
   isAlive: boolean;
   role?: 'browser' | 'agent';
   sessionId?: string;
+  browserId?: string;
 }
 
 function originAllowed(req: IncomingMessage, extensionId: string): boolean {
@@ -46,8 +47,8 @@ function originAllowed(req: IncomingMessage, extensionId: string): boolean {
 }
 
 export function startServer(config: Config, deps: ServerDeps = {}): Promise<BrokerServer> {
-  const buffer = deps.buffer ?? new ConsoleBuffer();
-  const router = deps.router ?? new Router(buffer);
+  const registry = deps.registry ?? new ProfileRegistry();
+  const router = deps.router ?? new Router(registry);
   const heartbeatMs = deps.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
 
   const wss = new WebSocketServer({
@@ -62,8 +63,7 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
     },
   });
 
-  /** The currently-connected and authenticated browser socket (if any). */
-  let browserSocket: LiveSocket | null = null;
+  const browsers = new Map<string, LiveSocket>();
   const browserConnectedCallbacks = new Set<() => void>();
 
   wss.on('connection', (raw: WebSocket, req: IncomingMessage) => {
@@ -90,17 +90,22 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
       }
 
       if (hello.role === 'browser') {
-        if (!browserOrigin || hello.extensionId !== config.extensionId) {
+        if (!browserOrigin || hello.extensionId !== config.extensionId || typeof hello.instanceId !== 'string') {
           ws.close(4001, 'UNAUTHORIZED');
           return;
         }
+        const browserId = hello.instanceId;
         ws.role = 'browser';
-        browserSocket = ws;
-        attachBrowser(ws, router, () => {
-          // On disconnect, clear the tracked socket reference.
-          if (browserSocket === ws) browserSocket = null;
+        ws.browserId = browserId;
+        // Replace a stale socket for the same profile.
+        const prev = browsers.get(browserId);
+        if (prev && prev !== ws) prev.terminate();
+        browsers.set(browserId, ws);
+        registry.connected(browserId, hello.label);
+        attachBrowser(ws, browserId, router, () => {
+          if (browsers.get(browserId) === ws) browsers.delete(browserId);
         });
-        // Notify listeners that the browser has (re)connected.
+        router.announceProfileChange(browserId);
         for (const cb of browserConnectedCallbacks) cb();
         return;
       }
@@ -143,7 +148,8 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
         host: HOST,
         router,
         hasBrowserConnection(): boolean {
-          return browserSocket !== null && browserSocket.readyState === WebSocket.OPEN;
+          for (const ws of browsers.values()) if (ws.readyState === WebSocket.OPEN) return true;
+          return false;
         },
         onBrowserConnected(cb: () => void): void {
           browserConnectedCallbacks.add(cb);
@@ -152,10 +158,8 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
           browserConnectedCallbacks.delete(cb);
         },
         dropBrowserConnection(): void {
-          if (browserSocket !== null) {
-            browserSocket.terminate();
-            browserSocket = null;
-          }
+          for (const ws of browsers.values()) ws.terminate();
+          browsers.clear();
         },
         close: () =>
           new Promise<void>((res) => {
@@ -168,8 +172,8 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
   });
 }
 
-function attachBrowser(ws: LiveSocket, router: Router, onClose: () => void): void {
-  router.registerBrowser((msg: JsonRpcMessage) => ws.send(JSON.stringify(msg)));
+function attachBrowser(ws: LiveSocket, browserId: string, router: Router, onClose: () => void): void {
+  router.registerBrowser(browserId, (msg: JsonRpcMessage) => ws.send(JSON.stringify(msg)));
   ws.on('message', (data: RawData) => {
     let msg: JsonRpcMessage;
     try {
@@ -177,11 +181,11 @@ function attachBrowser(ws: LiveSocket, router: Router, onClose: () => void): voi
     } catch {
       return;
     }
-    router.handleBrowserMessage(msg);
+    router.handleBrowserMessage(browserId, msg);
   });
   ws.on('close', () => {
     onClose();
-    router.onBrowserDisconnect();
+    router.onBrowserDisconnect(browserId);
   });
 }
 

@@ -51,10 +51,14 @@ async function connectAgent(s: BrokerServer, token: string, sessionId: string): 
   return ws;
 }
 
-async function connectBrowser(s: BrokerServer): Promise<WebSocket> {
+async function connectBrowser(
+  s: BrokerServer,
+  instanceId = 'test-profile',
+  label = 'Test',
+): Promise<WebSocket> {
   const ws = new WebSocket(url(s), { headers: { Origin: ORIGIN } });
   await open(ws);
-  const hello: BrowserHello = { type: 'hello', role: 'browser', extensionId: 'pinnedextid' };
+  const hello: BrowserHello = { type: 'hello', role: 'browser', extensionId: 'pinnedextid', instanceId, label };
   ws.send(JSON.stringify(hello));
   return ws;
 }
@@ -114,19 +118,36 @@ describe('broker server', () => {
     await once(browser); // ensure it was forwarded (and thus pending)
     browser.terminate();
 
-    // The agent receives both the EXTENSION_DISCONNECTED response and an ON_STATUS notif (any order).
+    // The agent receives both the EXTENSION_DISCONNECTED response and an ON_PROFILE_CHANGE notif (any order).
     const got = await new Promise<{ err: boolean; status: boolean }>((resolve) => {
       let err = false;
       let status = false;
       agent.on('message', (d) => {
         const m = JSON.parse(d.toString()) as JsonRpcMessage;
         if ('error' in m && (m as JsonRpcErrorResponse).error.code === ErrorCode.EXTENSION_DISCONNECTED) err = true;
-        if ('method' in m && (m as { method: string }).method === Notif.ON_STATUS) status = true;
+        if ('method' in m && (m as { method: string }).method === Notif.ON_PROFILE_CHANGE) status = true;
         if (err && status) resolve({ err, status });
       });
     });
     expect(got.err).toBe(true);
     expect(got.status).toBe(true);
+  });
+
+  it('tracks two profiles independently and routes by browserId', async () => {
+    server = await startServer(config);
+    const b1 = await connectBrowser(server, 'p1', 'One');
+    const b2 = await connectBrowser(server, 'p2', 'Two');
+    await new Promise((r) => setTimeout(r, 50)); // let both hellos register
+    expect(server.hasBrowserConnection()).toBe(true);
+    expect(server.router.connectedBrowserIds().sort()).toEqual(['p1', 'p2']);
+
+    const agent = await connectAgent(server, 'secret-token', 'sess-mp');
+    const req: JsonRpcRequest = { jsonrpc: '2.0', id: 9, method: Method.GET_TABS, params: { browserId: 'p2' } };
+    agent.send(JSON.stringify(req));
+    // Only p2 should receive the forwarded request.
+    const fwd = await once<JsonRpcRequest>(b2);
+    expect(fwd.method).toBe(Method.GET_TABS);
+    void b1;
   });
 
   it('terminates a link that fails to pong within a heartbeat tick', async () => {
