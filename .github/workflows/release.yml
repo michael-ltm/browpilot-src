@@ -1,0 +1,63 @@
+name: Release Extension
+
+# Packages the Chrome extension (packages/extension/dist) into a zip and
+# attaches it to a GitHub Release. Triggered by pushing a v* tag, or manually
+# from the Actions tab (workflow_dispatch) with a tag input.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0); created at HEAD if it does not exist'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: package extension → release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # shared must build first — the extension bundles it.
+      - name: Build extension
+        run: |
+          npm run build -w @claude-browser/shared
+          npm run build -w @claude-browser/extension
+
+      - name: Resolve tag
+        id: meta
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Package dist into a zip
+        run: |
+          cd packages/extension/dist
+          zip -r "$GITHUB_WORKSPACE/claude-browser-extension-${{ steps.meta.outputs.tag }}.zip" . \
+            -x '*.map' '*.tsbuildinfo'
+
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          ASSET="claude-browser-extension-${TAG}.zip"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --title "$TAG" \
+              --notes "Unpacked Chrome extension (MV3). Download, unzip, then load via chrome://extensions → Developer mode → Load unpacked." \
+              --generate-notes
+          fi
