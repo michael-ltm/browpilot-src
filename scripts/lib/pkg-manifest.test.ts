@@ -4,7 +4,7 @@ import { makePackageManifest } from './pkg-manifest.js';
 describe('makePackageManifest', () => {
   it('builds a publishable manifest with bin, files, deps and version', () => {
     const m = makePackageManifest('0.2.0', { ws: '^8.18.0' });
-    expect(m.name).toBe('claude-browser');
+    expect(m.name).toBe('@john523100/claude-browser');
     expect(m.version).toBe('0.2.0');
     expect(m.bin['claude-browser']).toBe('dist/mcp.js');
     expect(m.files).toEqual(['dist', 'extension']);

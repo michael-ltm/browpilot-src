@@ -77,12 +77,12 @@ sequenceDiagram
 
 **1. 注册 MCP（免 clone，一行命令）:**
 ```bash
-claude mcp add claude-browser -- npx -y claude-browser
+claude mcp add claude-browser -- npx -y @john523100/claude-browser
 ```
 Claude Code 会用 `npx` 拉起 MCP server，broker 自动拉起（无需常驻服务，跨平台）。
 
 **2. 加载扩展:**
-- 下载 [最新 Release](https://github.com/michael-ltm/claude-browser/releases) 里的 `claude-browser-extension-*.zip` 并解压；或运行 `npx claude-browser extension-path` 打印已打包的扩展目录。
+- 下载 [最新 Release](https://github.com/michael-ltm/claude-browser/releases) 里的 `claude-browser-extension-*.zip` 并解压；或运行 `npx -y @john523100/claude-browser extension-path` 打印已打包的扩展目录。
 - 打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选该目录。
 - 点开扩展 popup 给这个 profile 起名（默认自动用你的 Google 邮箱名）。
 

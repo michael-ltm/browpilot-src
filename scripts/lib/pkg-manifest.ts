@@ -14,7 +14,7 @@ export interface PublishManifest {
 /** Build the package.json for the assembled, publishable `claude-browser` package. */
 export function makePackageManifest(version: string, dependencies: Record<string, string>): PublishManifest {
   return {
-    name: 'claude-browser',
+    name: '@john523100/claude-browser',
     version,
     description: 'Codex-style stable browser control for Claude Code (MCP server + broker + extension).',
     type: 'module',

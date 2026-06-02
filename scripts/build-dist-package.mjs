@@ -57,5 +57,5 @@ writeFileSync(
   JSON.stringify(makePackageManifest(root.version, publishDeps), null, 2) + '\n',
 );
 // 6. README for the npm page.
-writeFileSync(`${OUT}/README.md`, '# claude-browser\n\nInstall: `claude mcp add claude-browser -- npx -y claude-browser`\n\nThen load the unpacked extension printed by `npx claude-browser extension-path`. See https://github.com/michael-ltm/claude-browser\n');
+writeFileSync(`${OUT}/README.md`, '# @john523100/claude-browser\n\nInstall: `claude mcp add claude-browser -- npx -y @john523100/claude-browser`\n\nThen load the unpacked extension printed by `npx -y @john523100/claude-browser extension-path`. See https://github.com/michael-ltm/claude-browser\n');
 console.log(`Assembled ${OUT}/ (claude-browser@${root.version})`);

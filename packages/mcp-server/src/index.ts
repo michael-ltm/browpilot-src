@@ -119,7 +119,7 @@ if (isEntry) {
     if (dir) process.stdout.write(dir + '\n');
     else { process.stderr.write('extension dir not found\n'); process.exit(1); }
   } else if (cmd.kind === 'install') {
-    const r = spawnSync('claude', ['mcp', 'add', 'claude-browser', '--', 'npx', '-y', 'claude-browser'], { stdio: 'inherit' });
+    const r = spawnSync('claude', ['mcp', 'add', 'claude-browser', '--', 'npx', '-y', '@john523100/claude-browser'], { stdio: 'inherit' });
     process.exit(r.status ?? 0);
   } else if (cmd.kind === 'version') {
     let v = '0.0.0';
