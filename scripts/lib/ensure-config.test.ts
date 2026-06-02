@@ -44,7 +44,8 @@ describe('ensureConfig', () => {
     expect(cfg.extensionId).toBe('newnewnewnewnewnewnewnewnewnewne');
   });
 
-  it('writes config with 0600 permissions (user-only readable)', async () => {
+  // POSIX-only: Windows has no 0600 mode bits, so skip the permission assertion there.
+  it.skipIf(process.platform === 'win32')('writes config with 0600 permissions (user-only readable)', async () => {
     await ensureConfig(configFile, 'abcdefghijklmnopabcdefghijklmnop');
     const { stat } = await import('node:fs/promises');
     const mode = (await stat(configFile)).mode & 0o777;
