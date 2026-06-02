@@ -4,7 +4,7 @@
 > 用你**真实的 Chrome（带你已登录的账号）**，截图 + 坐标操作 *和* 结构化 DOM 操作，全部从终端里的 Claude Code 驱动。
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/单元测试-209%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/单元测试-210%20passing-brightgreen)
 ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-Claude%20Code-8A2BE2)
 ![platform](https://img.shields.io/badge/platform-macOS%20·%20Windows%20·%20Linux-lightgrey)
@@ -105,7 +105,7 @@ docs/superpowers/  设计规格 + 50 步实现计划
 
 ## 🧪 测试状态
 
-- **209 个单元测试全部通过**（shared / broker / extension / mcp-server + 安装器辅助库），`tsc` 类型检查与构建全绿；CI 在 ubuntu + windows 上跑。
+- **210 个单元测试全部通过**（shared / broker / extension / mcp-server + 安装器辅助库），`tsc` 类型检查与构建全绿；CI 在 ubuntu + windows 上跑。
 - 重连纪律（alarm + 心跳 + 重连）由 `transport.test.ts` 单测覆盖。
 - e2e / soak 测试**已写好**，但需要能加载未打包扩展的浏览器（见下方限制）。
 

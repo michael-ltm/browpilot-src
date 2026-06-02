@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     sessionId: randomUUID(),
   });
 
-  const server = new McpServer({ name: 'claude-browser', version: '0.1.0' });
+  const server = new McpServer({ name: 'claude-browser', version: '0.1.1' });
   const ctx = makeToolContext(client);
   registerAll(server, ctx);
 

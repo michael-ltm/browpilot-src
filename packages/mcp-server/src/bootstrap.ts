@@ -19,30 +19,76 @@ export function idFromManifestKey(manifestKey: string): string {
   return id;
 }
 
+const EXT_ID_RE = /^[a-p]{32}$/;
+
+/** Derive the pinned extension id from the bundled extension's manifest `key`, or null when unavailable. */
+function deriveExtensionId(extensionDir: string | null): string | null {
+  if (!extensionDir) return null;
+  const manifestPath = join(extensionDir, 'manifest.json');
+  if (!existsSync(manifestPath)) return null;
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { key?: string };
+    return manifest.key ? idFromManifestKey(manifest.key) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * First-run bootstrap for the npx / standalone flow: create
- * ~/.claude-browser/config.json (DEFAULT_PORT + a random token + an extensionId
- * derived from the bundled extension manifest `key`) if it does not already
- * exist. Idempotent — an existing config is left untouched so the token stays
- * stable. When the config already exists, `extensionDir` is not needed.
+ * First-run + self-healing bootstrap for the npx / standalone flow. Ensures
+ * ~/.claude-browser/config.json exists AND stays consistent with the bundled
+ * extension:
+ *   - missing or corrupt config        → written fresh
+ *   - empty / invalid / mismatched id   → repaired (id re-derived from the
+ *                                         bundled manifest), preserving a valid
+ *                                         existing port + token
+ *   - already correct                   → left untouched (token stays stable)
+ *
+ * The extension id MUST match the bundled extension, otherwise the broker pins
+ * the wrong Origin and the extension can never connect — a stale config with an
+ * empty/wrong id is the classic "stuck reconnecting / -32000 ConnectionClosed"
+ * failure (loadConfig throws on an empty id, crashing the MCP server).
  */
 export function ensureConfig(extensionDir: string | null, home: string = homedir()): void {
   const path = join(home, CONFIG_DIR, CONFIG_FILE);
-  if (existsSync(path)) return;
-  if (!extensionDir) {
+  const derivedId = deriveExtensionId(extensionDir);
+
+  let existing: Partial<Config> | null = null;
+  if (existsSync(path)) {
+    try {
+      existing = JSON.parse(readFileSync(path, 'utf8')) as Partial<Config>;
+    } catch {
+      existing = null; // corrupt JSON → rewrite from scratch
+    }
+  }
+
+  const hasToken = typeof existing?.token === 'string' && existing.token.length > 0;
+  const hasPort = typeof existing?.port === 'number' && Number.isInteger(existing.port);
+  const existingId =
+    typeof existing?.extensionId === 'string' && EXT_ID_RE.test(existing.extensionId)
+      ? existing.extensionId
+      : null;
+
+  // Healthy and consistent with the bundled extension → leave it untouched.
+  if (existing && hasToken && hasPort && existingId && (derivedId === null || existingId === derivedId)) {
+    return;
+  }
+
+  // Otherwise (re)write. The id comes from the bundled manifest, or from a still
+  // valid existing id when there is no bundled extension to derive from.
+  const extensionId = derivedId ?? existingId;
+  if (!extensionId) {
     throw new Error(
-      'claude-browser: bundled extension not found, cannot derive extensionId. ' +
-        'Run from the published package, or build the extension (npm run build -w @claude-browser/extension).',
+      'claude-browser: bundled extension not found and config has no valid extensionId — ' +
+        'cannot pin the extension id. Run from the published package, or build the extension ' +
+        '(npm run build -w @claude-browser/extension).',
     );
   }
-  const manifest = JSON.parse(readFileSync(join(extensionDir, 'manifest.json'), 'utf8')) as { key?: string };
-  if (!manifest.key) {
-    throw new Error('claude-browser: extension manifest has no "key"; cannot pin the extension id');
-  }
+
   const cfg: Config = {
-    port: DEFAULT_PORT,
-    token: randomBytes(32).toString('hex'),
-    extensionId: idFromManifestKey(manifest.key),
+    port: hasPort ? (existing!.port as number) : DEFAULT_PORT,
+    token: hasToken ? (existing!.token as string) : randomBytes(32).toString('hex'),
+    extensionId,
   };
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(cfg, null, 2), { encoding: 'utf8', mode: 0o600 });
