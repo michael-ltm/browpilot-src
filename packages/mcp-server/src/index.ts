@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     sessionId: randomUUID(),
   });
 
-  const server = new McpServer({ name: 'claude-browser', version: '0.1.1' });
+  const server = new McpServer({ name: 'claude-browser', version: '0.1.2' });
   const ctx = makeToolContext(client);
   registerAll(server, ctx);
 
@@ -101,11 +101,30 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
+/**
+ * True when this module is the process entry point. argv[1] is realpath-resolved
+ * because npm/npx invoke bins through a `.bin` symlink, whereas import.meta.url
+ * is already symlink-resolved by Node — without this, the entry check fails
+ * under npx and the MCP server never starts (Claude sees ConnectionClosed
+ * -32000). Exported + realpath-injectable so it can be unit-tested.
+ */
+export function isMainModule(
+  moduleUrl: string,
+  argvPath: string | undefined,
+  realpath: (p: string) => string = realpathSync,
+): boolean {
+  if (argvPath === undefined) return false;
+  try {
+    return moduleUrl === pathToFileURL(realpath(argvPath)).href;
+  } catch {
+    return false;
+  }
+}
+
 // Only run the MCP server when this module is the process entry point. Importing
 // the library barrel (the integration harness imports createClient/registerTools)
 // must NOT start a stdio server or call process.exit.
-const isEntry =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isEntry = isMainModule(import.meta.url, process.argv[1]);
 if (isEntry) {
   const cmd = parseCli(process.argv.slice(2));
   const here = dirname(fileURLToPath(import.meta.url));
