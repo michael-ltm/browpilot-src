@@ -116,8 +116,20 @@ describe('dom tools', () => {
     client.onCdp('Runtime.evaluate', { result: { value: 42 } });
     const t = tool('browser_eval');
     expect(t.description.toLowerCase()).toContain('arbitrary');
-    await t.handler({ expression: '40 + 2', tabId: 5 }, ctx);
+    const res = await t.handler({ expression: '40 + 2', tabId: 5 }, ctx);
     const ev = client.cdpCalls()[0]!;
-    expect(ev.params).toMatchObject({ expression: '40 + 2', returnByValue: true });
+    // awaitPromise is required so async expressions resolve instead of returning a bare Promise ({}).
+    expect(ev.params).toMatchObject({ expression: '40 + 2', returnByValue: true, awaitPromise: true });
+    expect((res.content[0] as { text: string }).text).toBe('42');
+  });
+
+  it('browser_eval surfaces a thrown/rejected expression as an error instead of null', async () => {
+    client.onCdp('Runtime.evaluate', {
+      result: { value: undefined },
+      exceptionDetails: { exception: { description: 'ReferenceError: nope is not defined' } },
+    });
+    const res = await tool('browser_eval').handler({ expression: 'nope', tabId: 5 }, ctx);
+    expect(res.isError).toBe(true);
+    expect((res.content[0] as { text: string }).text).toMatch(/ReferenceError: nope/);
   });
 });

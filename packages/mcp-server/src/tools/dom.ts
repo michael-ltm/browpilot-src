@@ -98,7 +98,7 @@ const browser_query = defineTool({
       : `(() => { const el = document.querySelector(${sel}); return el ? el.outerHTML : null; })()`;
     const out = await execCdp<{ result: { value: unknown } }>(ctx, tabId, {
       method: 'Runtime.evaluate',
-      params: { expression, returnByValue: true },
+      params: { expression, returnByValue: true, awaitPromise: true },
     });
     return textResult(String(out.result?.value ?? 'null'));
   },
@@ -114,7 +114,7 @@ const browser_get_text = defineTool({
     const expression = `(() => { const el = ${target}; return el ? el.innerText : null; })()`;
     const out = await execCdp<{ result: { value: unknown } }>(ctx, tabId, {
       method: 'Runtime.evaluate',
-      params: { expression, returnByValue: true },
+      params: { expression, returnByValue: true, awaitPromise: true },
     });
     return textResult(String(out.result?.value ?? ''));
   },
@@ -126,10 +126,19 @@ const browser_eval = defineTool({
   inputSchema: { expression: z.string(), tabId: z.number().int() },
   async handler({ expression, tabId }, ctx): Promise<ToolResult> {
     await ctx.attach(tabId);
-    const out = await execCdp<{ result: { value: unknown } }>(ctx, tabId, {
+    const out = await execCdp<{
+      result: { value: unknown };
+      exceptionDetails?: { text?: string; exception?: { description?: string } };
+    }>(ctx, tabId, {
       method: 'Runtime.evaluate',
-      params: { expression, returnByValue: true },
+      // awaitPromise: resolve async expressions instead of returning the bare Promise
+      // (which serializes to {}). returnByValue: deep-copy the result out of the page.
+      params: { expression, returnByValue: true, awaitPromise: true },
     });
+    if (out.exceptionDetails) {
+      const { exception, text } = out.exceptionDetails;
+      return errorResult(exception?.description ?? text ?? 'evaluation threw');
+    }
     return textResult(JSON.stringify(out.result?.value ?? null));
   },
 });

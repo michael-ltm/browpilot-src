@@ -93,7 +93,7 @@ const browser_wait = defineTool({
       for (;;) {
         const out = await execCdp<{ result: { value: unknown } }>(ctx, tabId, {
           method: 'Runtime.evaluate',
-          params: { expression, returnByValue: true },
+          params: { expression, returnByValue: true, awaitPromise: true },
         });
         if (out.result?.value === true) return textResult(`selector ${selector} appeared`);
         if (waited >= deadline) return textResult(`timed out waiting for ${selector}`);
