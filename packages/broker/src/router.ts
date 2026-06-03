@@ -16,8 +16,14 @@ import {
   type ListProfilesResult,
   type OnCdpEventParams,
   type ConsoleEntry,
+  type SubscribeEventsParams,
+  type SubscribeEventsResult,
+  type GetEventsParams,
+  type GetEventsResult,
+  type CdpEvent,
 } from '@claude-browser/shared';
 import { ConsoleBuffer } from './buffer.js';
+import { EventBuffer } from './event-buffer.js';
 import type { ProfileRegistry } from './profiles.js';
 
 type Send = (msg: JsonRpcMessage) => void;
@@ -86,6 +92,10 @@ function leaseKey(browserId: string, tabId: number): string {
 export class Router {
   private readonly browsers = new Map<string, Send>();
   private readonly buffers = new Map<string, ConsoleBuffer>();
+  /** Per-profile buffer of subscribed CDP events (Network/Debugger/Target/...). */
+  private readonly eventBuffers = new Map<string, EventBuffer>();
+  /** Per-profile set of subscribed CDP event method prefixes (e.g. 'Network.'). */
+  private readonly subscriptions = new Map<string, Set<string>>();
   private readonly agents = new Map<string, Send>();
   private readonly pending = new Map<number, Pending>();
   /** leaseKey(browserId, tabId) -> owning sessionId */
@@ -97,6 +107,7 @@ export class Router {
   registerBrowser(browserId: string, send: Send): void {
     this.browsers.set(browserId, send);
     if (!this.buffers.has(browserId)) this.buffers.set(browserId, new ConsoleBuffer());
+    if (!this.eventBuffers.has(browserId)) this.eventBuffers.set(browserId, new EventBuffer());
   }
   registerAgent(sessionId: string, send: Send): void {
     this.agents.set(sessionId, send);
@@ -138,6 +149,26 @@ export class Router {
       const params = (req.params ?? {}) as GetConsoleParams;
       const buf = this.buffers.get(browserId);
       const result: GetConsoleResult = { entries: buf ? buf.query(params) : [] };
+      return Promise.resolve({ jsonrpc: '2.0', id: req.id, result });
+    }
+
+    // Broker-local: set which CDP event method prefixes to buffer for this profile.
+    if (req.method === Method.SUBSCRIBE_EVENTS) {
+      const params = (req.params ?? {}) as SubscribeEventsParams;
+      // Union by default so enabling one capture (Network.) doesn't drop another
+      // (Debugger.); pass replace:true to reset the set.
+      const set = params.replace ? new Set<string>() : (this.subscriptions.get(browserId) ?? new Set<string>());
+      for (const p of params.prefixes ?? []) set.add(p);
+      this.subscriptions.set(browserId, set);
+      const result: SubscribeEventsResult = { prefixes: [...set] };
+      return Promise.resolve({ jsonrpc: '2.0', id: req.id, result });
+    }
+    // Broker-local: read (and optionally clear) buffered CDP events.
+    if (req.method === Method.GET_EVENTS) {
+      const params = (req.params ?? {}) as GetEventsParams;
+      const buf = this.eventBuffers.get(browserId);
+      const result: GetEventsResult = { events: buf ? buf.query(params) : [] };
+      if (params.clear) buf?.clear();
       return Promise.resolve({ jsonrpc: '2.0', id: req.id, result });
     }
 
@@ -257,8 +288,14 @@ export class Router {
     // Browser notification (method, no id) — buffer console + tag with browserId + broadcast.
     if ('method' in msg && !('id' in msg)) {
       if (msg.method === Notif.ON_CDP_EVENT) {
-        const entry = toConsoleEntry(msg.params as OnCdpEventParams);
+        const cdp = msg.params as OnCdpEventParams;
+        const entry = toConsoleEntry(cdp);
         if (entry) this.buffers.get(browserId)?.push(entry);
+        const subs = this.subscriptions.get(browserId);
+        if (subs && subs.size > 0 && [...subs].some((p) => cdp.method.startsWith(p))) {
+          const ev: CdpEvent = { tabId: cdp.source?.tabId, method: cdp.method, params: cdp.params, timestamp: Date.now() };
+          this.eventBuffers.get(browserId)?.push(ev);
+        }
       }
       const params = (msg.params ?? {}) as Record<string, unknown>;
       this.broadcastToAgents({ jsonrpc: '2.0', method: msg.method, params: { ...params, browserId } });
@@ -273,6 +310,8 @@ export class Router {
   onBrowserDisconnect(browserId: string): void {
     this.browsers.delete(browserId);
     this.buffers.delete(browserId);
+    this.eventBuffers.delete(browserId);
+    this.subscriptions.delete(browserId);
     for (const [cid, entry] of this.pending) {
       if (entry.browserId === browserId) {
         clearTimeout(entry.timer);

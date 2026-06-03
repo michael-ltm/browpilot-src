@@ -17,7 +17,7 @@ export const ErrorCode = {
 export const Method = {
   EXECUTE_CDP: 'executeCdp', GET_TABS: 'getTabs', NEW_TAB: 'newTab', SWITCH_TAB: 'switchTab',
   CLOSE_TAB: 'closeTab', GET_HISTORY: 'getHistory', ATTACH: 'attach', DETACH: 'detach',
-  GET_CONSOLE: 'getConsole', PING: 'ping',
+  GET_CONSOLE: 'getConsole', SUBSCRIBE_EVENTS: 'subscribeEvents', GET_EVENTS: 'getEvents', PING: 'ping',
   LIST_PROFILES: 'listProfiles', GET_PROFILE_STATUS: 'getProfileStatus', GET_PROFILE_LOGS: 'getProfileLogs',
 } as const;
 
@@ -42,6 +42,13 @@ export interface GetHistoryResult { entries: HistoryEntry[]; }
 export interface ConsoleEntry { tabId: number; level: string; text: string; timestamp: number; args?: unknown[]; url?: string; line?: number; }
 export interface GetConsoleParams { tabId?: number; filter?: string; since?: number; browserId?: string; }
 export interface GetConsoleResult { entries: ConsoleEntry[]; }
+// Generic CDP event capture: subscribe by method prefix (e.g. 'Network.', 'Debugger.'),
+// the broker buffers matching forwarded events, then GET_EVENTS reads them.
+export interface CdpEvent { tabId?: number; method: string; params: unknown; timestamp: number; }
+export interface SubscribeEventsParams { prefixes: string[]; replace?: boolean; browserId?: string; }
+export interface SubscribeEventsResult { prefixes: string[]; }
+export interface GetEventsParams { tabId?: number; methodPrefix?: string; since?: number; limit?: number; clear?: boolean; browserId?: string; }
+export interface GetEventsResult { events: CdpEvent[]; }
 export interface OnCdpEventParams { source: CdpTarget; method: string; params: unknown; }
 export type OnConsoleParams = ConsoleEntry;
 export interface OnStatusParams { state: 'connected' | 'disconnected' | 'reconnecting'; detail?: string; }

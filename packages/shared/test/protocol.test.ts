@@ -27,6 +27,8 @@ describe('Method constant wire values', () => {
       ATTACH: 'attach',
       DETACH: 'detach',
       GET_CONSOLE: 'getConsole',
+      SUBSCRIBE_EVENTS: 'subscribeEvents',
+      GET_EVENTS: 'getEvents',
       PING: 'ping',
       LIST_PROFILES: 'listProfiles',
       GET_PROFILE_STATUS: 'getProfileStatus',
