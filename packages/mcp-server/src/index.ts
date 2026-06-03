@@ -75,6 +75,17 @@ export function resolveExtensionDir(here: string, exists: (p: string) => boolean
   return null;
 }
 
+/** Read the version from the co-located package.json (published: dist/mcp.js -> ../package.json). */
+function readPackageVersion(here: string): string {
+  try {
+    return (
+      (JSON.parse(readFileSync(resolvePath(here, '../package.json'), 'utf8')) as { version?: string }).version ?? '0.0.0'
+    );
+  } catch {
+    return '0.0.0';
+  }
+}
+
 async function main(): Promise<void> {
   // First-run bootstrap (npx flow): write ~/.claude-browser/config.json if absent,
   // deriving extensionId from the bundled extension manifest. No-op if it exists.
@@ -88,7 +99,7 @@ async function main(): Promise<void> {
     sessionId: randomUUID(),
   });
 
-  const server = new McpServer({ name: 'claude-browser', version: '0.1.2' });
+  const server = new McpServer({ name: 'claude-browser', version: readPackageVersion(here) });
   const ctx = makeToolContext(client);
   registerAll(server, ctx);
 
@@ -141,13 +152,7 @@ if (isEntry) {
     const r = spawnSync('claude', ['mcp', 'add', 'claude-browser', '--', 'npx', '-y', '@john523100/claude-browser'], { stdio: 'inherit' });
     process.exit(r.status ?? 0);
   } else if (cmd.kind === 'version') {
-    let v = '0.0.0';
-    try {
-      v = (JSON.parse(readFileSync(resolvePath(here, '../package.json'), 'utf8')) as { version?: string }).version ?? v;
-    } catch {
-      /* fall back to default */
-    }
-    process.stdout.write('claude-browser ' + v + '\n');
+    process.stdout.write('claude-browser ' + readPackageVersion(here) + '\n');
   } else {
     process.stdout.write(
       'Usage:\n  claude-browser                run the MCP server (used by Claude Code)\n' +

@@ -113,6 +113,16 @@ describe('Transport', () => {
     expect(FakeWebSocket.instances.length).toBe(before + 1);
   });
 
+  it('reports "waiting" (not "reconnecting") when it closes before ever connecting', async () => {
+    const { Transport } = await loadTransport();
+    const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
+    t.connect();
+    const ws = FakeWebSocket.latest();
+    ws.emitClose(); // broker down / no Claude session: socket never opened
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mock.storage.claudeBrowserStatus).toMatchObject({ state: 'waiting' });
+  });
+
   it('sends a heartbeat ping at 30s and forces reconnect when no pong in 3s', async () => {
     const { Transport } = await loadTransport();
     const t = new Transport({ port: 8787, extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });

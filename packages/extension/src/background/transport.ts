@@ -41,6 +41,7 @@ interface Pending {
 export class Transport {
   private readonly opts: TransportOptions;
   private ws: WebSocket | null = null;
+  private everConnected = false;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
   private readonly requestHandlers = new Map<string, RequestHandler>();
@@ -74,6 +75,7 @@ export class Transport {
     const ws = new WebSocket(`ws://127.0.0.1:${this.opts.port}`);
     this.ws = ws;
     ws.onopen = () => {
+      this.everConnected = true;
       const hello: BrowserHello = { type: 'hello', role: 'browser', extensionId: this.opts.extensionId, instanceId: this.opts.instanceId, label: this.opts.label };
       ws.send(JSON.stringify(hello));
       void this.setStatus('connected');
@@ -188,7 +190,10 @@ export class Transport {
     }
     this.pending.clear();
     this.ws = null;
-    void this.setStatus('reconnecting');
+    // Distinguish "never connected yet" (no broker / no Claude session running)
+    // from a genuine drop, so the popup shows a calm "waiting" rather than the
+    // alarming "reconnecting" when the user simply hasn't started a session.
+    void this.setStatus(this.everConnected ? 'reconnecting' : 'waiting');
     this.scheduleReconnect();
   }
 

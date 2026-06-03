@@ -51,7 +51,7 @@ export interface GetEventsParams { tabId?: number; methodPrefix?: string; since?
 export interface GetEventsResult { events: CdpEvent[]; }
 export interface OnCdpEventParams { source: CdpTarget; method: string; params: unknown; }
 export type OnConsoleParams = ConsoleEntry;
-export interface OnStatusParams { state: 'connected' | 'disconnected' | 'reconnecting'; detail?: string; }
+export interface OnStatusParams { state: 'connected' | 'disconnected' | 'reconnecting' | 'waiting'; detail?: string; }
 
 // Auth handshake: FIRST message each client sends after the socket opens.
 export interface AgentHello { type: 'hello'; role: 'agent'; token: string; sessionId: string; }

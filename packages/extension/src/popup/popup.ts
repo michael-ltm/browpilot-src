@@ -9,10 +9,11 @@ export interface StatusView {
 }
 
 export function statusDisplay(status: OnStatusParams | undefined): StatusView {
-  const state = status?.state ?? 'disconnected';
+  const state = status?.state ?? 'waiting';
   const base: Record<OnStatusParams['state'], StatusView> = {
     connected: { color: '#22c55e', label: 'Connected' },
     reconnecting: { color: '#f59e0b', label: 'Reconnecting…' },
+    waiting: { color: '#9ca3af', label: 'Waiting for Claude Code…' },
     disconnected: { color: '#ef4444', label: 'Disconnected' },
   };
   const view = { ...base[state] };
