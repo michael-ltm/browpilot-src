@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { installChromeMock, installFakeWebSocket, type ChromeMock } from './chromeMock';
 import { Method } from '@claude-browser/shared';
-import { RECONNECT_ALARM } from '../src/background/transport';
+import { RECONNECT_ALARM, KEEPALIVE_ALARM, KEEPALIVE_PERIOD_MIN } from '../src/background/transport';
 
 let mock: ChromeMock;
 
@@ -75,5 +75,43 @@ describe('background/index bootstrap', () => {
     bootstrap(t as never);
     mock.alarms.fire('some-other-alarm');
     expect(t.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('arms a persistent keepalive watchdog alarm at startup', async () => {
+    const { bootstrap } = await import('../src/background/index');
+    const t = makeFakeTransport();
+    bootstrap(t as never);
+    expect(mock.alarms.created[KEEPALIVE_ALARM]).toEqual({ periodInMinutes: KEEPALIVE_PERIOD_MIN });
+  });
+
+  it('the keepalive alarm triggers transport.connect()', async () => {
+    const { bootstrap } = await import('../src/background/index');
+    const t = makeFakeTransport();
+    bootstrap(t as never);
+    expect(t.connect).toHaveBeenCalledTimes(1);
+    mock.alarms.fire(KEEPALIVE_ALARM);
+    expect(t.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('never clears the keepalive watchdog (survives an abrupt SW death)', async () => {
+    const { bootstrap } = await import('../src/background/index');
+    const t = makeFakeTransport();
+    bootstrap(t as never);
+    expect(mock.alarms.cleared).not.toContain(KEEPALIVE_ALARM);
+  });
+
+  it('pings a chrome API under 30s to keep the worker from suspending', async () => {
+    vi.useFakeTimers();
+    try {
+      const { bootstrap } = await import('../src/background/index');
+      const t = makeFakeTransport();
+      const ping = mock.chrome.runtime.getPlatformInfo as unknown as ReturnType<typeof vi.fn>;
+      ping.mockClear();
+      bootstrap(t as never);
+      vi.advanceTimersByTime(25_000);
+      expect(ping.mock.calls.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

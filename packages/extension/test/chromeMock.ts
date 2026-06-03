@@ -102,7 +102,15 @@ export function installChromeMock(): ChromeMock {
   };
 
   const chromeObj = {
-    runtime: { id: 'testextensionid', lastError: undefined as unknown },
+    runtime: {
+      id: 'testextensionid',
+      lastError: undefined as unknown,
+      getPlatformInfo: vi.fn((cb?: (info: { os: string; arch: string }) => void) => {
+        const info = { os: 'mac', arch: 'arm64' };
+        cb?.(info);
+        return Promise.resolve(info);
+      }),
+    },
     alarms: {
       create: vi.fn((name: string, info: chrome.alarms.AlarmCreateInfo) => {
         alarms.created[name] = info;

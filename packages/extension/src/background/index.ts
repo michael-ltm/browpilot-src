@@ -8,7 +8,13 @@ import {
   type GetHistoryParams,
   Method,
 } from '@claude-browser/shared';
-import { Transport, RECONNECT_ALARM } from './transport';
+import {
+  Transport,
+  RECONNECT_ALARM,
+  KEEPALIVE_ALARM,
+  KEEPALIVE_PERIOD_MIN,
+  KEEPALIVE_PING_MS,
+} from './transport';
 import { handleExecuteCdp, attach, detach, registerCdpEventForwarding, registerAutoReattach } from './relay';
 import { getTabs, newTab, switchTab, closeTab, getHistory } from './helpers';
 import { resolvePort, resolveExtensionId, getInstanceId, getLabel } from './config';
@@ -34,11 +40,30 @@ export function bootstrap(transport: Transport): void {
   registerCdpEventForwarding(transport);
   registerAutoReattach();
 
-  // The alarm survives service-worker death: when Chrome wakes the SW to fire it,
-  // we reconnect (the connection is also re-established by the top-level eager connect).
+  // A persistent watchdog so an idle profile can never get stuck offline. While the
+  // socket is open this alarm sits idle; the moment the SW is revived to fire it (after
+  // an abrupt death that skipped `ws.onclose`), `connect()` restores the link. Created
+  // here on every SW wake — `chrome.alarms.create` with the same name is idempotent, so
+  // re-arming costs nothing — and is never cleared, unlike RECONNECT_ALARM.
+  void chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: KEEPALIVE_PERIOD_MIN });
+
+  // Either alarm waking us is a cue to ensure the socket is up. connect() is a no-op
+  // when the socket is already OPEN/CONNECTING, so an unconditional call is safe.
   chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === RECONNECT_ALARM) transport.connect();
+    if (alarm.name === RECONNECT_ALARM || alarm.name === KEEPALIVE_ALARM) transport.connect();
   });
+
+  // Keep the worker awake while the device is: a trivial chrome API call every <30s
+  // resets MV3's idle timer so it never reaches the suspension cutoff. This runs
+  // unconditionally (even with no socket) so the extension is always ready to connect
+  // the instant a Claude session appears, rather than waiting for the watchdog tick.
+  setInterval(() => {
+    try {
+      chrome.runtime.getPlatformInfo(() => void chrome.runtime.lastError);
+    } catch {
+      /* worker tearing down — the keepalive alarm will revive it */
+    }
+  }, KEEPALIVE_PING_MS);
 
   // Eager connect on every SW startup.
   transport.connect();

@@ -11,6 +11,18 @@ import {
 } from '@claude-browser/shared';
 
 export const RECONNECT_ALARM = 'claude-browser-reconnect';
+// Persistent watchdog alarm. Unlike RECONNECT_ALARM (created on close, cleared on
+// open), this one is created once at startup and NEVER cleared. It is the only wake
+// source that survives an *abrupt* service-worker death (OS sleep / memory pressure),
+// where `ws.onclose` never fires and so `scheduleReconnect()` never runs. Chrome wakes
+// the SW to fire it, which re-runs the eager connect and re-arms the watchdog.
+export const KEEPALIVE_ALARM = 'claude-browser-keepalive';
+export const KEEPALIVE_PERIOD_MIN = 1;
+// MV3 suspends a service worker after 30s of inactivity. Touching any chrome API
+// resets that idle timer, so a sub-30s self-ping keeps the worker alive for as long
+// as the device is awake — it can't beat OS sleep / memory pressure / an extension
+// update, but KEEPALIVE_ALARM revives the worker within ~1 min in those cases.
+export const KEEPALIVE_PING_MS = 20_000;
 export const STATUS_KEY = 'claudeBrowserStatus';
 
 const RECONNECT_DELAY_MS = 5000;
