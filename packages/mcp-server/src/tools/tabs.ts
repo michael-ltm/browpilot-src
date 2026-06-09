@@ -26,7 +26,7 @@ const browser_get_tabs = defineTool({
 const browser_new_tab = defineTool({
   name: 'browser_new_tab',
   description: 'Open a new tab, optionally at a URL. Returns the new tab id.',
-  inputSchema: { url: z.string().url().optional(), profile: z.string().optional() },
+  inputSchema: { url: z.string().url().optional(), profile: z.string().optional().describe('profile label or browserId; defaults to the selected profile') },
   async handler({ url, profile }, ctx): Promise<ToolResult> {
     const params: NewTabParams = { url, ...profileParam(ctx, profile) };
     const tab = await ctx.client.request<NewTabResult>(Method.NEW_TAB, params);

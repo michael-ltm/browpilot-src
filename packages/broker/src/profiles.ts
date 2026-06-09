@@ -86,6 +86,13 @@ export class ProfileRegistry {
     return [...this.records.values()].filter((r) => r.status === 'connected').map((r) => r.browserId);
   }
 
+  /** browserIds of connected profiles whose label matches exactly (for label-or-id resolution). */
+  connectedByLabel(label: string): string[] {
+    return [...this.records.values()]
+      .filter((r) => r.status === 'connected' && r.label === label)
+      .map((r) => r.browserId);
+  }
+
   private pushEvent(r: ProfileRecord, kind: ProfileEvent['kind'], detail?: string): void {
     r.events.push(detail !== undefined ? { at: this.now(), kind, detail } : { at: this.now(), kind });
     if (r.events.length > MAX_EVENTS) r.events.shift();

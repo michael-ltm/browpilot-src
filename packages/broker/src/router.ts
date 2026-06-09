@@ -201,7 +201,19 @@ export class Router {
     explicit: string | undefined,
     reqId: number | string,
   ): { browserId: string } | { error: JsonRpcErrorResponse } {
-    if (explicit !== undefined) return { browserId: explicit };
+    if (explicit !== undefined) {
+      // Exact browserId match — the common case.
+      if (this.browsers.has(explicit)) return { browserId: explicit };
+      // Otherwise accept a profile LABEL (browser_select_profile takes a label, so a
+      // per-call `profile`/browserId should too). Resolve label -> connected browserId.
+      const byLabel = this.registry.connectedByLabel(explicit).filter((id) => this.browsers.has(id));
+      if (byLabel.length === 1) return { browserId: byLabel[0]! };
+      if (byLabel.length > 1) {
+        return { error: errorResponse(reqId, ErrorCode.AMBIGUOUS_PROFILE, `multiple connected profiles labeled "${explicit}"; pass a browserId`, { profiles: this.registry.list() }) };
+      }
+      // Unknown id/label: fall through so the caller surfaces the clear "not connected" error.
+      return { browserId: explicit };
+    }
     const ids = [...this.browsers.keys()];
     if (ids.length === 1) return { browserId: ids[0]! };
     if (ids.length === 0) return { error: errorResponse(reqId, ErrorCode.EXTENSION_DISCONNECTED, 'no browser profile connected') };

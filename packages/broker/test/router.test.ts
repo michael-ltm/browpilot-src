@@ -44,6 +44,25 @@ describe('Router multi-browser routing', () => {
     expect(t.browserSends['b']!.length).toBe(1);
   });
 
+  it('routes by profile LABEL when the param is a label, not a browserId', async () => {
+    const t = setup(); t.connectBrowser('a', 'Work'); t.connectBrowser('b', 'Home');
+    // 'Work' is a's label (not a browserId) — should still resolve to browser 'a'.
+    const p = t.router.routeRequest('s1', { jsonrpc: '2.0', id: 3, method: Method.GET_TABS, params: { browserId: 'Work' } });
+    expect(t.browserSends['b']!.length).toBe(0);
+    const fwd = t.lastFwd('a');
+    t.router.handleBrowserMessage('a', { jsonrpc: '2.0', id: fwd.id, result: { tabs: [] } });
+    await p;
+    expect(t.browserSends['a']!.length).toBe(1);
+  });
+
+  it('errors "not connected" when the profile id/label is unknown (does not silently auto-route)', async () => {
+    const t = setup(); t.connectBrowser('a', 'Work');
+    const res = (await t.router.routeRequest('s1', { jsonrpc: '2.0', id: 4, method: Method.GET_TABS, params: { browserId: 'nope' } })) as any;
+    expect(res.error.code).toBe(ErrorCode.EXTENSION_DISCONNECTED);
+    expect(String(res.error.message)).toMatch(/not connected/);
+    expect(t.browserSends['a']!.length).toBe(0);
+  });
+
   it('serves listProfiles locally', async () => {
     const t = setup(); t.connectBrowser('a', 'A');
     const res = (await t.router.routeRequest('s1', { jsonrpc: '2.0', id: 3, method: Method.LIST_PROFILES, params: {} })) as any;

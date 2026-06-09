@@ -93,6 +93,9 @@ describe('dom tools', () => {
     await tool('browser_fill').handler({ ref: 'ref2', value: 'a@b.com', tabId: 5 }, ctx);
     const cdp = client.cdpCalls();
     expect(cdp.some((c) => c.method === 'DOM.focus' && c.params?.backendNodeId === 200)).toBe(true);
+    // clears existing content first (select-all + trusted Backspace) so fill REPLACES, not appends
+    expect(cdp.some((c) => c.method === 'Runtime.evaluate' && /el\.select|selectNodeContents/.test(String(c.params?.expression)))).toBe(true);
+    expect(cdp.some((c) => c.method === 'Input.dispatchKeyEvent' && c.params?.key === 'Backspace')).toBe(true);
     expect(cdp.some((c) => c.method === 'Input.insertText' && c.params?.text === 'a@b.com')).toBe(true);
   });
 

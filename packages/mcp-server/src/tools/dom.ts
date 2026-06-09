@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ErrorCode } from '@claude-browser/shared';
-import { clickEvents, insertTextCmd, boxCenter } from '../cdp.js';
+import { clickEvents, insertTextCmd, boxCenter, keyEvents } from '../cdp.js';
 import { compactAxTree, type AxTree } from '../snapshot.js';
 import {
   defineTool,
@@ -68,9 +68,16 @@ const browser_click_ref = defineTool({
   },
 });
 
+/** Select all content of the focused element (input/textarea/contenteditable), platform-independent. */
+const SELECT_ALL_FOCUSED =
+  '(() => { const el = document.activeElement; if (!el) return false;' +
+  ' if (typeof el.select === "function") el.select();' +
+  ' else if (el.isContentEditable) { const r = document.createRange(); r.selectNodeContents(el);' +
+  ' const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } return true; })()';
+
 const browser_fill = defineTool({
   name: 'browser_fill',
-  description: 'Focus an element by its [refN] handle and type a value into it.',
+  description: 'Set an element (by its [refN] handle) to a value: focuses it, CLEARS existing content, then types the value via trusted Input events (replaces, does not append). Use browser_type to append at the cursor.',
   inputSchema: { ref: z.string(), value: z.string(), tabId: z.number().int() },
   async handler({ ref, value, tabId }, ctx): Promise<ToolResult> {
     let backendNodeId: number;
@@ -81,7 +88,14 @@ const browser_fill = defineTool({
     }
     await ctx.attach(tabId);
     await execCdp(ctx, tabId, { method: 'DOM.focus', params: { backendNodeId } });
-    await execCdp(ctx, tabId, insertTextCmd(value));
+    // Clear first so fill REPLACES rather than appends: select all, then a trusted Backspace
+    // (fires real input events React/Vue trackers respect), then type the new value.
+    await execCdp(ctx, tabId, {
+      method: 'Runtime.evaluate',
+      params: { expression: SELECT_ALL_FOCUSED, returnByValue: true },
+    });
+    await execCdpSeq(ctx, tabId, keyEvents('Backspace'));
+    if (value.length > 0) await execCdp(ctx, tabId, insertTextCmd(value));
     return textResult(`filled ${ref}`);
   },
 });
@@ -122,7 +136,7 @@ const browser_get_text = defineTool({
 
 const browser_eval = defineTool({
   name: 'browser_eval',
-  description: 'DANGER: runs arbitrary JavaScript in the page via Runtime.evaluate and returns the value. Permission-gated; only use with explicit user intent.',
+  description: 'DANGER: runs arbitrary JavaScript in the page via Runtime.evaluate and returns the value. Async is awaited — return a Promise or use an async IIFE and you get the resolved value directly (no need to stash results on window and poll). Permission-gated; only use with explicit user intent.',
   inputSchema: { expression: z.string(), tabId: z.number().int() },
   async handler({ expression, tabId }, ctx): Promise<ToolResult> {
     await ctx.attach(tabId);
