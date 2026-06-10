@@ -15,9 +15,14 @@ import {
   KEEPALIVE_PERIOD_MIN,
   KEEPALIVE_PING_MS,
 } from './transport';
-import { handleExecuteCdp, attach, detach, registerCdpEventForwarding, registerAutoReattach } from './relay';
+import { handleExecuteCdp, attach, detach, registerCdpEventForwarding, registerAutoReattach, checkIdle } from './relay';
 import { getTabs, newTab, switchTab, closeTab, getHistory } from './helpers';
-import { resolvePort, resolveExtensionId, getInstanceId, getLabel } from './config';
+import { resolvePort, resolveExtensionId, getInstanceId, getLabel, resolveIdleDetachMin } from './config';
+
+/** Detach any debugger idle past the user's configured timeout (0 = never). */
+async function sweepIdle(): Promise<void> {
+  await checkIdle(await resolveIdleDetachMin());
+}
 
 /** Pure wiring: register handlers, event forwarding, alarm reconnect, eager connect. */
 export function bootstrap(transport: Transport): void {
@@ -49,8 +54,11 @@ export function bootstrap(transport: Transport): void {
 
   // Either alarm waking us is a cue to ensure the socket is up. connect() is a no-op
   // when the socket is already OPEN/CONNECTING, so an unconditional call is safe.
+  // The keepalive tick (~1 min) also drives the idle-detach sweep: when CDP has been
+  // quiet past the user's timeout, drop the debugger so Chrome's banner clears.
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === RECONNECT_ALARM || alarm.name === KEEPALIVE_ALARM) transport.connect();
+    if (alarm.name === KEEPALIVE_ALARM) void sweepIdle();
   });
 
   // Keep the worker awake while the device is: a trivial chrome API call every <30s

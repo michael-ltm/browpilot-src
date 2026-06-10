@@ -6,6 +6,8 @@ let mock: ChromeMock;
 
 beforeEach(() => {
   mock = installChromeMock();
+  // Each test gets a fresh relay module so its idle-detach singleton starts clean.
+  vi.resetModules();
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -105,5 +107,73 @@ describe('relay', () => {
     mock.emitDetach({ tabId: 9 }, 'canceled_by_user');
     await new Promise((r) => setTimeout(r, 5));
     expect(mock.chrome.debugger.attach).not.toHaveBeenCalled();
+  });
+
+  it('checkIdle detaches an attached tab once idle past the timeout (minutes)', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const { attach, checkIdle } = await loadRelay();
+      mock.sendCommandImpl = async () => ({});
+      await attach({ tabId: 7 });
+      vi.setSystemTime(30 * 60_000);
+      const detached = await checkIdle(30);
+      expect(detached).toEqual([7]);
+      expect(mock.chrome.debugger.detach).toHaveBeenCalledWith({ tabId: 7 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('checkIdle(0) never detaches (feature disabled)', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const { attach, checkIdle } = await loadRelay();
+      mock.sendCommandImpl = async () => ({});
+      await attach({ tabId: 7 });
+      vi.setSystemTime(10 * 60 * 60_000);
+      expect(await checkIdle(0)).toEqual([]);
+      expect(mock.chrome.debugger.detach).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a CDP command counts as activity and defers idle detach', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const { attach, handleExecuteCdp, checkIdle } = await loadRelay();
+      mock.sendCommandImpl = async () => ({});
+      await attach({ tabId: 7 });
+      vi.setSystemTime(29 * 60_000);
+      await handleExecuteCdp({ target: { tabId: 7 }, method: 'Runtime.evaluate', params: {} });
+      vi.setSystemTime((29 + 29) * 60_000);
+      expect(await checkIdle(30)).toEqual([]);
+      expect(mock.chrome.debugger.detach).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does NOT auto-reattach a tab it idle-detached', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const { attach, checkIdle, registerAutoReattach } = await loadRelay();
+      mock.sendCommandImpl = async () => ({});
+      registerAutoReattach();
+      await attach({ tabId: 9 });
+      (mock.chrome.debugger.attach as ReturnType<typeof vi.fn>).mockClear();
+      vi.setSystemTime(30 * 60_000);
+      await checkIdle(30);
+      // Chrome may fire onDetach for our own detach; the listener must ignore it.
+      mock.emitDetach({ tabId: 9 }, 'target_closed_unexpectedly');
+      await Promise.resolve();
+      expect(mock.chrome.debugger.attach).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

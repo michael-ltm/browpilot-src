@@ -5,6 +5,7 @@ import {
   type OnCdpEventParams,
   Notif,
 } from '@claude-browser/shared';
+import { IdleDetacher } from './idle';
 
 /** Minimal surface of Transport that the relay needs (kept narrow for testability). */
 export interface CdpEventSink {
@@ -12,6 +13,19 @@ export interface CdpEventSink {
 }
 
 const CDP_VERSION = '1.3';
+
+/**
+ * One idle-detach tracker for the whole worker: any CDP command resets its
+ * countdown; checkIdle() (driven by the keepalive alarm) detaches every tab we
+ * hold once the browser has been idle past the configured timeout, clearing
+ * Chrome's "started debugging this browser" banner. The next tool call re-attaches.
+ */
+const idle = new IdleDetacher((tabId) => chrome.debugger.detach({ tabId }));
+
+/** Detach debuggers idle for >= idleMin minutes (0 disables). Returns detached tabIds. */
+export function checkIdle(idleMin: number): Promise<number[]> {
+  return idle.check(idleMin * 60_000);
+}
 
 function toDebuggee(target: CdpTarget): chrome.debugger.Debuggee {
   if (typeof target.tabId === 'number') return { tabId: target.tabId };
@@ -21,6 +35,7 @@ function toDebuggee(target: CdpTarget): chrome.debugger.Debuggee {
 
 /** executeCdp -> chrome.debugger.sendCommand pass-through. */
 export async function handleExecuteCdp(params: ExecuteCdpParams): Promise<ExecuteCdpResult> {
+  idle.recordActivity();
   const debuggee = toDebuggee(params.target);
   return chrome.debugger.sendCommand(debuggee, params.method, params.params);
 }
@@ -50,9 +65,11 @@ export async function attach(target: CdpTarget): Promise<void> {
   });
   await chrome.debugger.sendCommand(debuggee, 'Runtime.enable', {});
   await chrome.debugger.sendCommand(debuggee, 'Log.enable', {});
+  if (typeof target.tabId === 'number') idle.noteAttached(target.tabId);
 }
 
 export async function detach(target: CdpTarget): Promise<void> {
+  if (typeof target.tabId === 'number') idle.noteDetached(target.tabId);
   await chrome.debugger.detach(toDebuggee(target));
 }
 
@@ -72,6 +89,11 @@ export function registerCdpEventForwarding(transport: CdpEventSink): void {
 export function registerAutoReattach(): void {
   chrome.debugger.onDetach.addListener((source, reason) => {
     if (reason === 'canceled_by_user') return;
+    // A detach we triggered ourselves on idle timeout — leave it detached (one-shot).
+    if (typeof source.tabId === 'number' && idle.shouldSuppressReattach(source.tabId)) {
+      idle.clearSuppressed(source.tabId);
+      return;
+    }
     const target: CdpTarget = { tabId: source.tabId, targetId: source.targetId };
     void attach(target).catch(() => {
       /* best-effort; the heartbeat/reconnect path is the backstop */

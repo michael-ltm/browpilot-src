@@ -27,11 +27,14 @@
         font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
         color: #9ca3af; margin: 10px 0 6px;
       }
-      #cb-label {
+      #cb-label, #cb-idle {
         width: 100%; box-sizing: border-box; padding: 7px 9px;
         border: 1px solid #e5e7eb; border-radius: 7px; font: inherit;
       }
-      #cb-label:focus { outline: none; border-color: #c4b5fd; box-shadow: 0 0 0 3px #ede9fe; }
+      #cb-idle { width: 72px; }
+      #cb-label:focus, #cb-idle:focus { outline: none; border-color: #c4b5fd; box-shadow: 0 0 0 3px #ede9fe; }
+      .row { display: flex; align-items: center; gap: 8px; }
+      .row label { color: #374151; }
       .hint { color: #9ca3af; font-size: 11px; margin-top: 5px; }
       ol { margin: 0; padding-left: 18px; color: #374151; }
       ol code {
@@ -60,6 +63,15 @@
       <h2>Profile</h2>
       <input id="cb-label" type="text" placeholder="Profile name" autocomplete="off" />
       <div class="hint">Auto-detected from your Google account · type to override</div>
+    </section>
+
+    <section>
+      <h2>Debugger</h2>
+      <div class="row">
+        <input id="cb-idle" type="number" min="0" step="1" inputmode="numeric" />
+        <label for="cb-idle">minutes idle, then auto-detach</label>
+      </div>
+      <div class="hint">Clears Chrome's “debugging this browser” banner when idle · 0 = never</div>
     </section>
 
     <section>

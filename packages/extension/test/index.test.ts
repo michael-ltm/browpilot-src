@@ -2,6 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { installChromeMock, installFakeWebSocket, type ChromeMock } from './chromeMock';
 import { Method } from '@claude-browser/shared';
 import { RECONNECT_ALARM, KEEPALIVE_ALARM, KEEPALIVE_PERIOD_MIN } from '../src/background/transport';
+import { IDLE_DETACH_MIN_KEY } from '../src/background/config';
 
 let mock: ChromeMock;
 
@@ -91,6 +92,18 @@ describe('background/index bootstrap', () => {
     expect(t.connect).toHaveBeenCalledTimes(1);
     mock.alarms.fire(KEEPALIVE_ALARM);
     expect(t.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('the keepalive alarm runs an idle-detach sweep (reads the timeout setting)', async () => {
+    const { bootstrap } = await import('../src/background/index');
+    const t = makeFakeTransport();
+    bootstrap(t as never);
+    const get = mock.chrome.storage.local.get as unknown as ReturnType<typeof vi.fn>;
+    get.mockClear();
+    mock.alarms.fire(KEEPALIVE_ALARM);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(get).toHaveBeenCalledWith(IDLE_DETACH_MIN_KEY);
   });
 
   it('never clears the keepalive watchdog (survives an abrupt SW death)', async () => {

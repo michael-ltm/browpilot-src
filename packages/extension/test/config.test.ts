@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { installChromeMock } from './chromeMock.js';
-import { getInstanceId, getLabel, getProfileEmailName, LABEL_KEY } from '../src/background/config.js';
+import {
+  getInstanceId,
+  getLabel,
+  getProfileEmailName,
+  resolveIdleDetachMin,
+  IDLE_DETACH_MIN_KEY,
+  DEFAULT_IDLE_DETACH_MIN,
+  LABEL_KEY,
+} from '../src/background/config.js';
 
 describe('extension profile identity', () => {
   beforeEach(() => installChromeMock());
@@ -48,5 +56,33 @@ describe('profile name resolution', () => {
   it('getLabel falls back to Profile <shortId> when no custom and signed out', async () => {
     installChromeMock();
     expect(await getLabel('abcd1234')).toBe('Profile abcd');
+  });
+});
+
+describe('idle auto-detach setting', () => {
+  beforeEach(() => installChromeMock());
+
+  it('defaults to 30 minutes when unset', async () => {
+    expect(DEFAULT_IDLE_DETACH_MIN).toBe(30);
+    expect(await resolveIdleDetachMin()).toBe(30);
+  });
+
+  it('honors a stored positive integer', async () => {
+    await chrome.storage.local.set({ [IDLE_DETACH_MIN_KEY]: 5 });
+    expect(await resolveIdleDetachMin()).toBe(5);
+  });
+
+  it('honors 0 (disabled) as a valid stored value', async () => {
+    await chrome.storage.local.set({ [IDLE_DETACH_MIN_KEY]: 0 });
+    expect(await resolveIdleDetachMin()).toBe(0);
+  });
+
+  it('falls back to the default for a negative, fractional, or non-number value', async () => {
+    await chrome.storage.local.set({ [IDLE_DETACH_MIN_KEY]: -3 });
+    expect(await resolveIdleDetachMin()).toBe(30);
+    await chrome.storage.local.set({ [IDLE_DETACH_MIN_KEY]: 1.5 });
+    expect(await resolveIdleDetachMin()).toBe(30);
+    await chrome.storage.local.set({ [IDLE_DETACH_MIN_KEY]: 'oops' });
+    expect(await resolveIdleDetachMin()).toBe(30);
   });
 });

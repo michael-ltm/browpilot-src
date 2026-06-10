@@ -16,6 +16,20 @@ export function resolveExtensionId(): string {
 export const INSTANCE_ID_KEY = 'claudeBrowserInstanceId';
 export const LABEL_KEY = 'claudeBrowserLabel';
 
+export const IDLE_DETACH_MIN_KEY = 'claudeBrowserIdleDetachMin';
+/** Minutes of CDP inactivity before the debugger auto-detaches (0 = never). */
+export const DEFAULT_IDLE_DETACH_MIN = 30;
+
+/**
+ * Resolve the idle auto-detach timeout (minutes) from storage. Accepts any
+ * non-negative integer (0 disables); anything else falls back to the default.
+ */
+export async function resolveIdleDetachMin(): Promise<number> {
+  const got = await chrome.storage.local.get(IDLE_DETACH_MIN_KEY);
+  const v = (got as Record<string, unknown>)[IDLE_DETACH_MIN_KEY];
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : DEFAULT_IDLE_DETACH_MIN;
+}
+
 /** Read-or-generate the stable per-install profile id (the agent-facing browserId). */
 export async function getInstanceId(): Promise<string> {
   const got = await chrome.storage.local.get(INSTANCE_ID_KEY);
