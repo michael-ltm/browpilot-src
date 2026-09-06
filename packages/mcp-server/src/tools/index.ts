@@ -13,6 +13,7 @@ import { powerTools } from './power.js';
 import { networkTools } from './network.js';
 import { sourcesTools } from './sources.js';
 import { debuggerTools } from './debugger.js';
+import { detectTools } from './detect.js';
 
 /** Every v1 browser_* tool, in a stable order. */
 export const allTools: ToolDef[] = [
@@ -26,6 +27,7 @@ export const allTools: ToolDef[] = [
   ...networkTools,
   ...sourcesTools,
   ...debuggerTools,
+  ...detectTools,
 ];
 
 /** Agent-facing guidance returned when multiple profiles are connected and none is selected. */

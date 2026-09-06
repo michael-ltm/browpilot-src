@@ -4,7 +4,7 @@
 > 用你**真实的 Chrome（带你已登录的账号）**，截图 + 坐标操作 *和* 结构化 DOM 操作，全部从终端里的 Claude Code 驱动。
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/单元测试-229%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/单元测试-345%20passing-brightgreen)
 ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-Claude%20Code-8A2BE2)
 ![platform](https://img.shields.io/badge/platform-macOS%20·%20Windows%20·%20Linux-lightgrey)
@@ -70,6 +70,7 @@ sequenceDiagram
 | DOM / 结构化 | `browser_snapshot`（带稳定 `[refN]` 句柄的无障碍快照） · `browser_click_ref` · `browser_fill` · `browser_query` · `browser_get_text` · `browser_eval`（受权限控制） |
 | 导航 / 标签页 | `browser_navigate` · `browser_back/forward/reload` · `browser_wait` · `browser_get_tabs` · `browser_new_tab` · `browser_switch_tab` · `browser_close_tab` |
 | 调试 | `browser_console`（缓冲的控制台日志） |
+| 安装 / 探测 | `browser_detect`（列出本机浏览器 + 每个 profile 装没装扩展，只读） · `browser_install_extension`（未装时受控加载，见 [docs/extension-install.md](docs/extension-install.md)） |
 
 > **「比 chrome-mcp 好用」的关键**：截图 + 带 `[refN]` 句柄的快照配合使用——Claude 既能*看见*页面，又能拿到*可靠的元素句柄*，比纯坐标（Codex）和纯 DOM（chrome-mcp）都更稳。
 
@@ -82,6 +83,7 @@ claude mcp add claude-browser -- npx -y @john523100/claude-browser
 Claude Code 会用 `npx` 拉起 MCP server，broker 自动拉起（无需常驻服务，跨平台）。
 
 **2. 加载扩展:**
+- 先问 Claude 一句「跑一下 browser_detect」——它会列出本机每个浏览器 profile 装没装扩展，装过就直接跳到第 3 步。
 - 下载 [最新 Release](https://github.com/michael-ltm/claude-browser/releases) 里的 `claude-browser-extension-*.zip` 并解压；或运行 `npx -y @john523100/claude-browser extension-path` 打印已打包的扩展目录。
 - 打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选该目录。
 - 点开扩展 popup 给这个 profile 起名（默认自动用你的 Google 邮箱名）。
@@ -97,15 +99,17 @@ packages/
   shared/       JSON-RPC 协议契约 + 类型守卫
   broker/       守护进程（MCP 自动拉起）：路由 / 租约 / WS 鉴权 / 心跳
   extension/    MV3 扩展：瘦 CDP 中继 + 自愈重连 + 光标叠层 + popup
+  launcher/     浏览器探测 / 扩展状态判断 / 受控启动（纯逻辑，注入 os·fs·exec）
   mcp-server/   MCP stdio 服务：browser_* 工具 / CDP 构造器 / 自愈客户端
 scripts/        一键安装 / 卸载 + 安装器辅助库
 test/integration/  真实 Chrome 的 e2e + 稳定性 soak 测试
 docs/superpowers/  设计规格 + 50 步实现计划
+docs/extension-install.md  扩展安装路径的实测结论（Chrome 136/137 的两道闸门）
 ```
 
 ## 🧪 测试状态
 
-- **229 个单元测试全部通过**（shared / broker / extension / mcp-server + 安装器辅助库），`tsc` 类型检查与构建全绿；CI 在 ubuntu + windows 上跑。
+- **345 个单元测试全部通过**（shared / broker / extension / launcher / mcp-server + 安装器辅助库），`tsc` 类型检查与构建全绿；CI 在 ubuntu + windows 上跑。
 - 重连纪律（alarm + 心跳 + 重连）由 `transport.test.ts` 单测覆盖。
 - e2e / soak 测试**已写好**，但需要能加载未打包扩展的浏览器（见下方限制）。
 

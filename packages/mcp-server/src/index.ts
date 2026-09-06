@@ -8,7 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { loadConfig } from './load-config.js';
 import { ensureConfig } from './bootstrap.js';
 import { BrokerClient } from './client.js';
-import { createContext } from './context.js';
+import { createContext, type ContextOptions } from './context.js';
 import { registerAll } from './tools/index.js';
 
 // R4: re-export BrokerClient for M5 harness
@@ -24,8 +24,11 @@ export interface McpToolRegistrar {
 }
 
 /** R4: Factor the context-builder out of main() so M5 harness can reuse it. */
-export function makeToolContext(client: BrokerClient): ReturnType<typeof createContext> {
-  return createContext(client);
+export function makeToolContext(
+  client: BrokerClient,
+  opts: ContextOptions = {},
+): ReturnType<typeof createContext> {
+  return createContext(client, opts);
 }
 
 /** R4: Thin wrapper — create + connect a BrokerClient. */
@@ -46,8 +49,12 @@ export async function createClient(opts: {
 /** R4: Thin wrapper — register all tools on an McpServer using a pre-built client.
  *  Accepts McpToolRegistrar so test harnesses can pass a capture-sink directly,
  *  without a double-escape cast. McpServer satisfies this interface. */
-export function registerTools(server: McpToolRegistrar, client: BrokerClient): void {
-  registerAll(server as McpServer, makeToolContext(client));
+export function registerTools(
+  server: McpToolRegistrar,
+  client: BrokerClient,
+  opts: ContextOptions = {},
+): void {
+  registerAll(server as McpServer, makeToolContext(client, opts));
 }
 
 export type CliCommand =
@@ -90,7 +97,8 @@ async function main(): Promise<void> {
   // First-run bootstrap (npx flow): write ~/.claude-browser/config.json if absent,
   // deriving extensionId from the bundled extension manifest. No-op if it exists.
   const here = dirname(fileURLToPath(import.meta.url));
-  ensureConfig(resolveExtensionDir(here));
+  const extensionDir = resolveExtensionDir(here);
+  ensureConfig(extensionDir);
   const config = loadConfig();
 
   const client = new BrokerClient({
@@ -100,7 +108,7 @@ async function main(): Promise<void> {
   });
 
   const server = new McpServer({ name: 'claude-browser', version: readPackageVersion(here) });
-  const ctx = makeToolContext(client);
+  const ctx = makeToolContext(client, { extensionId: config.extensionId, extensionDir: extensionDir });
   registerAll(server, ctx);
 
   // Connect to the broker in the background: spawns it detached if down, then

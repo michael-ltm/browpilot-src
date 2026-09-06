@@ -8,6 +8,6 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  noExternal: ['@claude-browser/shared'],
+  noExternal: ['@claude-browser/shared', '@claude-browser/launcher'],
   banner: { js: '#!/usr/bin/env node' },
 });

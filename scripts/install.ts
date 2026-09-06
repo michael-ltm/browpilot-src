@@ -5,6 +5,8 @@ import { resolvePaths } from './lib/paths.js';
 import { ensureConfig } from './lib/ensure-config.js';
 import { readPinnedExtensionId } from './lib/manifest.js';
 import { run } from './lib/run.js';
+import { detectAll } from '@claude-browser/launcher';
+import { summarizeDetection } from './lib/detect-summary.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(here, '..');
@@ -29,15 +31,19 @@ async function main(): Promise<void> {
   await run('claude', ['mcp', 'add', 'claude-browser', '--', 'node', paths.mcpServerEntry]);
   log('Registered "claude-browser" MCP server.');
 
+  // Detect-first: say what is already loaded before asking for anything.
+  log('Looking for browsers and checking whether the extension is loaded...');
+  const summary = summarizeDetection(detectAll(extensionId), paths.extensionDist);
+
   process.stdout.write(
     [
       '',
       '============================================================',
-      ' Dev install complete. Load the extension from:',
-      `      ${paths.extensionDist}`,
+      ' Dev install complete.',
       '============================================================',
+      ...summary,
       '',
-    ].join('\n'),
+    ].join('\n') + '\n',
   );
 }
 
