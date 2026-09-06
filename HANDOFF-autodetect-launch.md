@@ -102,8 +102,9 @@ npm run install:browser                         # 装完 MCP 后自动跑一遍 
    的路径探测，覆盖绝大多数情况；`HKLM\...\App Paths\chrome.exe` 的兜底还没接。
 3. **Edge / Brave 的版本闸门**：目前把 136/137 两条线按 Chromium 主版本号一视同仁地用。
    Edge 跟 Chromium 主线同步，理论上一致，但**没有在真机 Edge 上验证过**。
-4. **真机跨平台验证**：mac / win 只有注入平台的单测覆盖，还缺各跑一次真机手测。
-   Linux + Chrome 151 已端到端验证。
+4. **Windows 真机验证**：Windows 分支（`Program Files` / `LOCALAPPDATA` 路径表、
+   `Application\<版本号>` 目录读版本、`wmic` 进程解析）目前**只有注入平台的单测**，
+   没有真机跑过——手头没有 Windows 主机。mac / Linux 已真机验证（见 §6）。
 
 ## 6. 验收标准（对照结果）
 
@@ -112,4 +113,14 @@ npm run install:browser                         # 装完 MCP 后自动跑一遍 
 - ✅ detect-first：已装时不重启、不加载。
 - ⚠️ 受控启动：**只在自定义用户数据目录下成立**（已端到端验证：关闭 → 重启 → CDP 加载 →
   扩展连上 broker，登录态保留）。默认目录下浏览器不允许，退回手动一步——**这是浏览器的限制，不是没做**。
-- ⚠️ mac / win：注入平台的单测已覆盖，真机手测还欠。
+
+### 真机验证记录
+
+| 平台 | 机器 | 结果 |
+|---|---|---|
+| **Linux** | 本机，Chrome 151 | ✅ 检测 + 受控启动 + CDP 加载 + 扩展连上 broker，全通 |
+| **macOS 15.5** | `macbookair`，Chrome 152 / Brave 151 | ✅ 检测：正确找到 `.app` bundle 路径、6 个 Chrome profile（含中文名「启明」）、4 个已装 2 个未装；**存在 `~/Library/Application Support/Microsoft Edge` 目录但没装 Edge.app → 正确地没把 Edge 报出来**；正在跑的 Chrome（无 `--user-data-dir`）正确归到默认目录。<br>✅ 受控启动：临时 profile + 假扩展，Chrome 152 上 `Extensions.loadUnpacked` 成功返回 id。 |
+| **Windows** | —— | ❌ **没跑过**：sshm 里 8 台机器全是 linux/macOS，没有 Windows 主机（`msg-linux` 用户名虽是 administrator，实为 Ubuntu）。 |
+
+> macOS 上「默认用户数据目录不许远程调试」这条闸门**没有在 mac 上实测**（要动用户真实
+> profile，代价太大）——它是 Chromium 主线行为，Linux 上实测过，mac 同版本代码库理应一致。
