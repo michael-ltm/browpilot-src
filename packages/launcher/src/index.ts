@@ -6,3 +6,6 @@ export * from './profiles.js';
 export * from './extension-state.js';
 export * from './running.js';
 export * from './report.js';
+export * from './launch.js';
+export * from './relaunch.js';
+export * from './install-flow.js';
