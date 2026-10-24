@@ -9,7 +9,7 @@ This repository distributes the Browpilot companion, extension packages, setup i
 Requires Node.js 20 or newer.
 
 ```sh
-npm install -g https://github.com/michael-ltm/browpilot/releases/download/v0.2.1/john523100-claude-browser-0.2.1.tgz
+npm install -g https://github.com/michael-ltm/browpilot/releases/download/v0.2.2/john523100-browpilot-0.2.2.tgz
 browpilot install codex
 # Or: browpilot install claude
 ```
@@ -57,7 +57,7 @@ See [review setup instructions](TESTING.md) for a direct MCP test without an AI 
 
 ## Validation and privacy
 
-Version 0.2.1 passed 337 automated tests, workspace type checks and builds. Real Linux Chromium verified offline installation evidence, cold startup/pairing, MCP tab control, automatic restart and evaluation in a second independent extension worker. Windows/macOS and actual Edge have not received equivalent live testing.
+Version 0.2.2 passed 442 automated tests, workspace type checks and builds. Real Linux Chromium verified offline installation evidence, cold startup/pairing, MCP tab control, automatic restart and evaluation in a second independent extension worker. Windows/macOS and actual Edge have not received equivalent live testing.
 
 See [Privacy policy](privacy.md). Tool results reach the MCP client and its AI provider; remote access also uses the tunnel/proxy you configure. No built-in analytics or hosted collection service is included.
 

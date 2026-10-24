@@ -8,6 +8,23 @@ export function pairingNonce(url: string | undefined, extensionId: string): stri
   return /^[A-Za-z0-9_-]{32}$/.test(nonce) ? nonce : null;
 }
 
+/**
+ * Send from the pairing page, retrying while the service worker has not
+ * registered its listener yet (cold start runs async setup first, and Chrome
+ * reports that window as "Receiving end does not exist").
+ */
+export async function sendUntilReceived<T>(send: () => Promise<T>, deadlineMs = 10_000, delayMs = 250, now: () => number = Date.now): Promise<T> {
+  const deadline = now() + deadlineMs;
+  for (;;) {
+    try {
+      return await send();
+    } catch (error) {
+      if (!/Receiving end does not exist/i.test(String((error as Error)?.message)) || now() >= deadline) throw error;
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 export async function pairRequest(message: { nonce?: unknown; type?: string }, sender: { id?: string; url?: string }, extensionId: string, send: (nonce: string) => Promise<unknown>) {
   if (sender.id !== extensionId || sender.url?.split(/[?#]/)[0] !== `chrome-extension://${extensionId}/pair.html`) throw new Error('Pairing is allowed only from our pairing page');
   if (typeof message.nonce !== 'string' || !/^[A-Za-z0-9_-]{32}$/.test(message.nonce)) throw new Error('Invalid pairing nonce');

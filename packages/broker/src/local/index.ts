@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
 import { access, mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve, sep } from 'node:path';
@@ -19,8 +20,35 @@ type Options = {
 };
 type Catalog = { profiles: Registration[]; bindings: Record<string, string>; aliases: Record<string, string> };
 
+/**
+ * The broker is often started by an agent process that has no desktop session
+ * variables, and a browser started without them exits at once ("Failed to
+ * connect to Wayland display") or cannot reach the keyring that encrypts its
+ * cookies. On Linux, fill in only what is missing from the user's runtime dir.
+ */
+export function graphicalEnv(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+  uid: number | undefined = process.getuid?.(),
+  fs: { exists: (p: string) => boolean; list: (p: string) => string[] } = { exists: existsSync, list: p => { try { return readdirSync(p); } catch { return []; } } },
+): NodeJS.ProcessEnv {
+  if (platform !== 'linux') return env;
+  const out = { ...env };
+  const runtime = out.XDG_RUNTIME_DIR || (uid !== undefined ? `/run/user/${uid}` : undefined);
+  if (!runtime || !fs.exists(runtime)) return out;
+  out.XDG_RUNTIME_DIR = runtime;
+  if (!out.WAYLAND_DISPLAY && !out.DISPLAY) {
+    const wayland = fs.list(runtime).filter(n => /^wayland-\d+$/.test(n)).sort()[0];
+    const x11 = fs.list('/tmp/.X11-unix').filter(n => /^X\d+$/.test(n)).sort()[0];
+    if (wayland) out.WAYLAND_DISPLAY = wayland;
+    if (x11) out.DISPLAY = ':' + x11.slice(1);
+  }
+  if (!out.DBUS_SESSION_BUS_ADDRESS && fs.exists(join(runtime, 'bus'))) out.DBUS_SESSION_BUS_ADDRESS = `unix:path=${join(runtime, 'bus')}`;
+  return out;
+}
+
 const defaultLaunch = (executable: string, args: string[]) => new Promise<void>((resolveLaunch, rejectLaunch) => {
-  const child = spawn(executable, args, { detached: true, stdio: 'ignore' });
+  const child = spawn(executable, args, { detached: true, stdio: 'ignore', env: graphicalEnv(process.env) });
   child.once('error', rejectLaunch);
   child.once('spawn', () => { child.unref(); resolveLaunch(); });
 });

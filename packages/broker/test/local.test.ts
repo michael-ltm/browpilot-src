@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { mkdtemp, mkdir, writeFile, symlink, readFile, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { LocalBrowserManager, localBrowserCandidates } from '../src/local/index.js';
+import { LocalBrowserManager, localBrowserCandidates, graphicalEnv } from '../src/local/index.js';
 import { RELEASED_CHROME_EXTENSION_ID, RELEASED_CHROME_STORE_URL, withReleaseDefaults } from '../src/release-config.js';
 
 async function fixture() {
@@ -322,5 +322,30 @@ describe('local browser lifecycle', () => {
     await writeFile(join(configDir, 'browser-profiles.json'), JSON.stringify({ profiles: [null, { browser: 'chrome', executable: f.executable, userDataDir: f.userDataDir }], bindings: {} }));
     const m = new LocalBrowserManager({ configDir, extensionIds: [], connectedIds: () => [], roots: [] });
     expect(await m.list()).toHaveLength(1);
+  });
+});
+
+describe('graphicalEnv', () => {
+  // Directory listings; a path exists when it is a listed dir or an entry of one.
+  const fs = (dirs: Record<string, string[]>) => ({
+    exists: (p: string) => p in dirs || Object.entries(dirs).some(([d, names]) => names.some(n => join(d, n) === p)),
+    list: (p: string) => dirs[p] ?? [],
+  });
+
+  it('fills in the Wayland display, runtime dir and session bus for a bare agent environment', () => {
+    const env = graphicalEnv({ PATH: '/usr/bin' }, 'linux', 1000, fs({ '/run/user/1000': ['wayland-1', 'wayland-1.lock', 'bus'] }));
+    expect(env).toMatchObject({ PATH: '/usr/bin', XDG_RUNTIME_DIR: '/run/user/1000', WAYLAND_DISPLAY: 'wayland-1', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus' });
+  });
+
+  it('keeps variables the session already provides', () => {
+    const env = graphicalEnv({ DISPLAY: ':1', DBUS_SESSION_BUS_ADDRESS: 'x' }, 'linux', 1000, fs({ '/run/user/1000': ['wayland-0'] }));
+    expect(env.DISPLAY).toBe(':1');
+    expect(env.WAYLAND_DISPLAY).toBeUndefined();
+    expect(env.DBUS_SESSION_BUS_ADDRESS).toBe('x');
+  });
+
+  it('leaves other platforms untouched', () => {
+    const base = { PATH: '/bin' };
+    expect(graphicalEnv(base, 'darwin', 501)).toBe(base);
   });
 });
