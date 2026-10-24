@@ -1,10 +1,10 @@
 import { pathToFileURL } from 'node:url';
-import type { Config } from '@claude-browser/shared';
+import type { Config } from '@browpilot/shared';
 import { loadConfig } from './config.js';
 import { startServer, type BrokerServer } from './server.js';
 
 // Re-export library API so consumers (e.g. scripts/install.ts) can import
-// from '@claude-browser/broker' without reaching into internal modules.
+// from '@browpilot/broker' without reaching into internal modules.
 export { startServer } from './server.js';
 export type { BrokerServer, ServerDeps } from './server.js';
 export { renderLaunchdPlist, LAUNCHD_LABEL } from './launchd.js';
@@ -59,7 +59,7 @@ export async function runBrokerDaemon(deps: BrokerDaemonDeps = {}): Promise<void
     const watchdog = setTimeout(() => {
       if (settled) return;
       log(
-        `[claude-browser-broker] not listening within ${bindTimeoutMs}ms; another broker already owns the port — exiting`,
+        `[browpilot-broker] not listening within ${bindTimeoutMs}ms; another broker already owns the port — exiting`,
       );
       exit(0);
       finish();
@@ -75,9 +75,9 @@ export async function runBrokerDaemon(deps: BrokerDaemonDeps = {}): Promise<void
           return;
         }
         clearTimeout(watchdog);
-        log(`[claude-browser-broker] listening on ws://${server.host}:${server.port}`);
+        log(`[browpilot-broker] listening on ws://${server.host}:${server.port}`);
         const shutdown = (signal: string): void => {
-          log(`[claude-browser-broker] ${signal} received, shutting down`);
+          log(`[browpilot-broker] ${signal} received, shutting down`);
           void server.close().then(() => exit(0));
         };
         process.on('SIGINT', () => shutdown('SIGINT'));
@@ -92,13 +92,13 @@ export async function runBrokerDaemon(deps: BrokerDaemonDeps = {}): Promise<void
         if (code === 'EADDRINUSE') {
           // Losing the bind race is the normal "already running" case — a broker
           // is already serving the port, so this one's job is done.
-          log('[claude-browser-broker] port already in use; another broker is running — exiting');
+          log('[browpilot-broker] port already in use; another broker is running — exiting');
           exit(0);
           finish();
           return;
         }
         // eslint-disable-next-line no-console
-        console.error('[claude-browser-broker] fatal:', err);
+        console.error('[browpilot-broker] fatal:', err);
         exit(1);
         finish();
       },

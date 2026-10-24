@@ -137,6 +137,10 @@ export function installChromeMock(): ChromeMock {
           for (const k of list) if (k in storage) out[k] = storage[k];
           return Promise.resolve(out);
         }),
+        remove: vi.fn((keys: string | string[]) => {
+          for (const k of Array.isArray(keys) ? keys : [keys]) delete storage[k];
+          return Promise.resolve();
+        }),
       },
     },
     debugger: {

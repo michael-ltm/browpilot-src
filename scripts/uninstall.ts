@@ -20,8 +20,11 @@ async function main(): Promise<void> {
   await run('launchctl', ['unload', paths.plistPath], { allowFailure: true });
   await rm(paths.plistPath, { force: true });
   log(`Removed ${paths.plistPath}`);
+  await run('launchctl', ['unload', paths.legacyPlistPath], { allowFailure: true });
+  await rm(paths.legacyPlistPath, { force: true });
 
   log('Removing MCP server registration...');
+  await run('claude', ['mcp', 'remove', 'browpilot'], { allowFailure: true });
   await run('claude', ['mcp', 'remove', 'claude-browser'], { allowFailure: true });
 
   if (purge) {

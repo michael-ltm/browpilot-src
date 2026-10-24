@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { access, mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve, sep } from 'node:path';
-import type { LocalBrowserFamily, LocalBrowserProfile } from '@claude-browser/shared';
+import type { LocalBrowserFamily, LocalBrowserProfile } from '@browpilot/shared';
 
 type Registration = Pick<LocalBrowserProfile, 'browser' | 'executable' | 'userDataDir'> & Partial<Pick<LocalBrowserProfile, 'profileDirectory' | 'label'>>;
 type Root = { browser: LocalBrowserFamily; executable: string; userDataDir: string };

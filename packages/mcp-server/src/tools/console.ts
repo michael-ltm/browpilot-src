@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Method, type GetConsoleParams, type GetConsoleResult } from '@claude-browser/shared';
+import { Method, type GetConsoleParams, type GetConsoleResult } from '@browpilot/shared';
 import { defineTool, textResult, type ToolDef, type ToolResult } from './types.js';
 import { profileParam } from '../context.js';
 

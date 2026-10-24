@@ -1,8 +1,8 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { CONFIG_DIR } from '@claude-browser/shared';
+import { CONFIG_DIR } from '@browpilot/shared';
 
-export const LAUNCHD_LABEL = 'com.claude-browser.broker';
+export const LAUNCHD_LABEL = 'com.browpilot.broker';
 
 export interface LaunchdOptions {
   nodePath: string;

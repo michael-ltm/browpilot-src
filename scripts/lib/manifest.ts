@@ -19,7 +19,7 @@ export async function readPinnedExtensionId(distDir: string): Promise<string> {
   } catch {
     throw new Error(
       `Extension manifest not found at ${manifestPath}. Build the extension first ` +
-        `(npm run build -w @claude-browser/extension).`,
+        `(npm run build -w @browpilot/extension).`,
     );
   }
   const manifest = JSON.parse(raw) as PartialManifest;

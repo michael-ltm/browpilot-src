@@ -1,14 +1,16 @@
 {
-  "name": "@claude-browser/mcp-server",
+  "name": "@browpilot/mcp-server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "claude-browser-mcp": "./dist/index.js"
+    "browpilot-mcp": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -16,7 +18,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@claude-browser/shared": "*",
+    "@browpilot/launcher": "*",
+    "@browpilot/shared": "*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "ws": "^8.18.0",
     "zod": "^3.23.8"

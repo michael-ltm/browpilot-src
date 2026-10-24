@@ -31,8 +31,8 @@ describe('applyLabelInput', () => {
   it('writes the trimmed label to storage under LABEL_KEY', async () => {
     installChromeMock();
     await applyLabelInput('  Personal  ');
-    const got = await chrome.storage.local.get('claudeBrowserLabel');
-    expect(got.claudeBrowserLabel).toBe('Personal');
+    const got = await chrome.storage.local.get('browpilotLabel');
+    expect(got.browpilotLabel).toBe('Personal');
   });
 });
 

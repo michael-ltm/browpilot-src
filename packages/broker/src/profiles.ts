@@ -1,4 +1,4 @@
-import type { ProfileInfo, ProfileEvent, ProfileStatus } from '@claude-browser/shared';
+import type { ProfileInfo, ProfileEvent, ProfileStatus } from '@browpilot/shared';
 
 const MAX_EVENTS = 50;
 

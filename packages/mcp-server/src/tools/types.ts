@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Method, type ExecuteCdpParams, type CdpTarget } from '@claude-browser/shared';
+import { Method, type ExecuteCdpParams, type CdpTarget } from '@browpilot/shared';
 import type { ToolContext } from '../context.js';
 import type { CdpCommand } from '../cdp.js';
 

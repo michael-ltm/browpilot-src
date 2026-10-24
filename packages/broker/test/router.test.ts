@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Router } from '../src/router.js';
 import { ProfileRegistry } from '../src/profiles.js';
-import { ErrorCode, Method, Notif, type JsonRpcMessage, type JsonRpcRequest } from '@claude-browser/shared';
+import { ErrorCode, Method, Notif, type JsonRpcMessage, type JsonRpcRequest } from '@browpilot/shared';
 
 function setup() {
   const registry = new ProfileRegistry();

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT } from '@claude-browser/shared';
+import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT } from '@browpilot/shared';
 import { loadConfig, ensureConfig, configPath } from '../src/config.js';
 import { RELEASED_CHROME_EXTENSION_ID, RELEASED_CHROME_STORE_URL } from '../src/release-config.js';
 

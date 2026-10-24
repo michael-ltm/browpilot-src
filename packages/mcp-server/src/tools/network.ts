@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Method, type GetEventsResult, type CdpEvent } from '@claude-browser/shared';
+import { Method, type GetEventsResult, type CdpEvent } from '@browpilot/shared';
 import { defineTool, execCdp, textResult, type ToolDef, type ToolResult } from './types.js';
 import type { ToolContext } from '../context.js';
 

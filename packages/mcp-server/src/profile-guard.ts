@@ -1,4 +1,4 @@
-import { ErrorCode, Method, type ListProfilesResult, type ProfileInfo } from '@claude-browser/shared';
+import { ErrorCode, Method, type ListProfilesResult, type ProfileInfo } from '@browpilot/shared';
 import { RpcError } from './client.js';
 import type { ToolContext } from './context.js';
 

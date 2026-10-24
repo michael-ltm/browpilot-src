@@ -1,4 +1,4 @@
-import type { ConsoleEntry, GetConsoleParams } from '@claude-browser/shared';
+import type { ConsoleEntry, GetConsoleParams } from '@browpilot/shared';
 
 const DEFAULT_CAP = 1000;
 

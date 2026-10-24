@@ -1,5 +1,5 @@
 {
-  "name": "@claude-browser/extension",
+  "name": "@browpilot/extension",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@claude-browser/shared": "*"
+    "@browpilot/shared": "*"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",

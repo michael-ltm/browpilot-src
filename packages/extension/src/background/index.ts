@@ -7,7 +7,7 @@ import {
   type CloseTabParams,
   type GetHistoryParams,
   Method,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 import {
   Transport,
   RECONNECT_ALARM,
@@ -17,7 +17,7 @@ import {
 } from './transport';
 import { handleExecuteCdp, attach, detach, registerCdpEventForwarding, registerAutoReattach, checkIdle } from './relay';
 import { getTabs, newTab, switchTab, closeTab, getHistory } from './helpers';
-import { resolvePort, resolveExtensionId, getInstanceId, getLabel, resolveIdleDetachMin } from './config';
+import { migrateLegacyStorage, resolvePort, resolveExtensionId, getInstanceId, getLabel, resolveIdleDetachMin } from './config';
 import { registerPairing } from './pairing';
 
 /** Detach any debugger idle past the user's configured timeout (0 = never). */
@@ -80,6 +80,7 @@ export function bootstrap(transport: Transport): void {
 
 // Top-level side effects: runs on every service-worker wake.
 async function main(): Promise<void> {
+  await migrateLegacyStorage();
   const port = await resolvePort();
   const extensionId = resolveExtensionId();
   const instanceId = await getInstanceId();

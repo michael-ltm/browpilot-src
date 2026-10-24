@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { consoleTools } from '../src/tools/console.js';
 import { createContext } from '../src/context.js';
 import { FakeClient } from './helpers/fake-client.js';
-import { Method } from '@claude-browser/shared';
+import { Method } from '@browpilot/shared';
 
 describe('console tool', () => {
   it('browser_console calls Method.GET_CONSOLE with filter/since/tabId and formats entries', async () => {

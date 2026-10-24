@@ -18,8 +18,8 @@ describe('isMainModule', () => {
     expect(isMainModule(moduleUrl, '/real/dist/mcp.js', identity)).toBe(true);
   });
   it('true when argv is a .bin symlink resolving to the module (npx case)', () => {
-    const realpath = (p: string) => (p === '/tmp/.bin/claude-browser' ? '/real/dist/mcp.js' : p);
-    expect(isMainModule(moduleUrl, '/tmp/.bin/claude-browser', realpath)).toBe(true);
+    const realpath = (p: string) => (p === '/tmp/.bin/browpilot' ? '/real/dist/mcp.js' : p);
+    expect(isMainModule(moduleUrl, '/tmp/.bin/browpilot', realpath)).toBe(true);
   });
   it('false when argv resolves elsewhere (imported as a library)', () => {
     expect(isMainModule(moduleUrl, '/some/vitest-runner.js', identity)).toBe(false);

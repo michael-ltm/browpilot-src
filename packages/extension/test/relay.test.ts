@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { installChromeMock, type ChromeMock } from './chromeMock';
-import { Notif } from '@claude-browser/shared';
+import { Notif } from '@browpilot/shared';
 
 let mock: ChromeMock;
 

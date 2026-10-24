@@ -31,10 +31,10 @@ jobs:
       - name: Install
         run: npm ci
 
-      # @claude-browser/shared must build first — the other packages resolve its
+      # @browpilot/shared must build first — the other packages resolve its
       # dist types, and npm's --workspaces order is not topological.
       - name: Build shared
-        run: npm run build -w @claude-browser/shared
+        run: npm run build -w @browpilot/shared
 
       - name: Build all packages
         run: npm run build

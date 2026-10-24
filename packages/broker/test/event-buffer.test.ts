@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EventBuffer } from '../src/event-buffer.js';
-import type { CdpEvent } from '@claude-browser/shared';
+import type { CdpEvent } from '@browpilot/shared';
 
 const ev = (method: string, tabId: number, timestamp: number): CdpEvent => ({ method, tabId, timestamp, params: {} });
 

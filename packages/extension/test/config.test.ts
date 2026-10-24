@@ -8,6 +8,8 @@ import {
   IDLE_DETACH_MIN_KEY,
   DEFAULT_IDLE_DETACH_MIN,
   LABEL_KEY,
+  INSTANCE_ID_KEY,
+  migrateLegacyStorage,
 } from '../src/background/config.js';
 
 describe('extension profile identity', () => {
@@ -43,7 +45,7 @@ describe('profile name resolution', () => {
   it('getLabel prefers a custom label over the email', async () => {
     const m = installChromeMock();
     m.identityEmail = 'user@example.com';
-    await chrome.storage.local.set({ claudeBrowserLabel: 'Work' });
+    await chrome.storage.local.set({ browpilotLabel: 'Work' });
     expect(await getLabel('abcd1234')).toBe('Work');
   });
 
@@ -84,5 +86,28 @@ describe('idle auto-detach setting', () => {
     expect(await resolveIdleDetachMin()).toBe(30);
     await chrome.storage.local.set({ [IDLE_DETACH_MIN_KEY]: 'oops' });
     expect(await resolveIdleDetachMin()).toBe(30);
+  });
+});
+
+describe('migrateLegacyStorage', () => {
+  it('moves claude-browser keys to Browpilot keys so the instance id survives the rename', async () => {
+    const mock = installChromeMock();
+    mock.storage.claudeBrowserInstanceId = 'legacy-id';
+    mock.storage.claudeBrowserLabel = 'Work';
+    await migrateLegacyStorage();
+    expect(mock.storage[INSTANCE_ID_KEY]).toBe('legacy-id');
+    expect(mock.storage[LABEL_KEY]).toBe('Work');
+    expect(mock.storage).not.toHaveProperty('claudeBrowserInstanceId');
+    expect(await getInstanceId()).toBe('legacy-id');
+    expect(mock.alarms.cleared).toEqual(expect.arrayContaining(['claude-browser-reconnect', 'claude-browser-keepalive']));
+  });
+
+  it('keeps a value already stored under the new key', async () => {
+    const mock = installChromeMock();
+    mock.storage[LABEL_KEY] = 'New';
+    mock.storage.claudeBrowserLabel = 'Old';
+    await migrateLegacyStorage();
+    expect(mock.storage[LABEL_KEY]).toBe('New');
+    expect(mock.storage).not.toHaveProperty('claudeBrowserLabel');
   });
 });

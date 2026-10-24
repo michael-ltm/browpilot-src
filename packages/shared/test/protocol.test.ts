@@ -74,7 +74,7 @@ describe('ErrorCode constant values', () => {
 describe('config constants', () => {
   it('pins the default port and config location', () => {
     expect(DEFAULT_PORT).toBe(8787);
-    expect(CONFIG_DIR).toBe('.claude-browser');
+    expect(CONFIG_DIR).toBe('.browpilot');
     expect(CONFIG_FILE).toBe('config.json');
   });
 });

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ErrorCode } from '@claude-browser/shared';
+import { ErrorCode } from '@browpilot/shared';
 import { clickEvents, insertTextCmd, boxCenter, keyEvents } from '../cdp.js';
 import { compactAxTree, type AxTree } from '../snapshot.js';
 import {

@@ -11,18 +11,18 @@ export interface PublishManifest {
   license: string;
 }
 
-/** Build the package.json for the assembled, publishable `claude-browser` package. */
+/** Build the package.json for the assembled, publishable `@john523100/browpilot` package. */
 export function makePackageManifest(version: string, dependencies: Record<string, string>): PublishManifest {
   return {
-    name: '@john523100/claude-browser',
+    name: '@john523100/browpilot',
     version,
     description: 'Browpilot — Browser MCP for AI agents, with local profile discovery, startup and extension debugging.',
     type: 'module',
-    bin: { 'claude-browser': 'dist/mcp.js', browpilot: 'dist/mcp.js' },
+    bin: { browpilot: 'dist/mcp.js' },
     files: ['dist', 'extension'],
     dependencies,
     engines: { node: '>=20' },
-    repository: { type: 'git', url: 'https://github.com/michael-ltm/claude-browser' },
+    repository: { type: 'git', url: 'https://github.com/michael-ltm/browpilot-src' },
     license: 'MIT',
   };
 }

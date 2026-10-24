@@ -9,7 +9,7 @@ import {
   type AgentHello,
   type JsonRpcMessage,
   type JsonRpcRequest,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 
 /** Minimal socket surface the client needs; `ws` satisfies it. */
 export interface ClientSocket {

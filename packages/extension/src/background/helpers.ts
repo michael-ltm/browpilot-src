@@ -8,7 +8,7 @@ import {
   type GetHistoryParams,
   type GetHistoryResult,
   type HistoryEntry,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 
 const DEFAULT_HISTORY_LIMIT = 100;
 

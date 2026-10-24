@@ -1,7 +1,7 @@
 {
   "name": "browpilot",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Browser MCP for AI agents: Codex, Claude Code and Grok",
   "type": "module",
   "engines": {
@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:integration": "RUN_BROWSER_TESTS=1 vitest run --config vitest.integration.config.ts",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/broker/tsconfig.json && tsc --noEmit -p packages/mcp-server/tsconfig.json && npm run typecheck -w @claude-browser/extension",
+    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/broker/tsconfig.json && tsc --noEmit -p packages/mcp-server/tsconfig.json && npm run typecheck -w @browpilot/extension",
     "clean": "rm -rf packages/*/dist",
     "install:browser": "tsx scripts/install.ts",
     "uninstall:browser": "tsx scripts/uninstall.ts"

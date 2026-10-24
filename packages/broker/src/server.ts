@@ -5,10 +5,10 @@ import {
   type Hello,
   type JsonRpcMessage,
   type JsonRpcRequest,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 import { Router } from './router.js';
 import { ProfileRegistry } from './profiles.js';
-import { CONFIG_DIR, Method } from '@claude-browser/shared';
+import { CONFIG_DIR, Method } from '@browpilot/shared';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { LocalBrowserManager } from './local/index.js';

@@ -1,15 +1,15 @@
 /**
  * Legacy animated cursor overlay. No active injection path uses this module.
  * Positioned with transform translate3d for GPU-accelerated, layout-free moves.
- * Exposes window.__claudeBrowserCursor.moveTo(x, y) so the relay can drive it.
+ * Exposes window.__browpilotCursor.moveTo(x, y) so the relay can drive it.
  */
 declare global {
   interface Window {
-    __claudeBrowserCursor?: { moveTo(x: number, y: number): void; destroy(): void };
+    __browpilotCursor?: { moveTo(x: number, y: number): void; destroy(): void };
   }
 }
 
-const CURSOR_ID = 'claude-browser-cursor';
+const CURSOR_ID = 'browpilot-cursor';
 
 function ensureCursor(): HTMLElement {
   const existing = document.getElementById(CURSOR_ID);
@@ -43,10 +43,10 @@ function moveTo(x: number, y: number): void {
 
 function destroy(): void {
   document.getElementById(CURSOR_ID)?.remove();
-  delete window.__claudeBrowserCursor;
+  delete window.__browpilotCursor;
 }
 
-window.__claudeBrowserCursor = { moveTo, destroy };
+window.__browpilotCursor = { moveTo, destroy };
 ensureCursor();
 
 export {};

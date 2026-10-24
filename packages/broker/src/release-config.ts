@@ -1,4 +1,4 @@
-import type { Config } from '@claude-browser/shared';
+import type { Config } from '@browpilot/shared';
 
 /** Assigned Chrome Web Store item ID; the public listing may appear after review. */
 export const RELEASED_CHROME_EXTENSION_ID = 'kglhakgapoegbnnbobnmnebmbljehcid';

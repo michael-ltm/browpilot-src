@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { installChromeMock, installFakeWebSocket, FakeWebSocket, type ChromeMock } from './chromeMock';
-import { ErrorCode, Method } from '@claude-browser/shared';
+import { ErrorCode, Method } from '@browpilot/shared';
 
 let mock: ChromeMock;
 
@@ -34,7 +34,7 @@ describe('Transport', () => {
     ws.emitOpen();
     const hello = JSON.parse(ws.sent[0]);
     expect(hello).toEqual({ type: 'hello', role: 'browser', extensionId: 'testextensionid', instanceId: 'test', label: 'Test' });
-    expect(mock.storage.claudeBrowserStatus).toMatchObject({ state: 'connected' });
+    expect(mock.storage.browpilotStatus).toMatchObject({ state: 'connected' });
   });
 
   it('correlates request ids and resolves with the result', async () => {
@@ -106,7 +106,7 @@ describe('Transport', () => {
     await expect(p).rejects.toMatchObject({ code: ErrorCode.EXTENSION_DISCONNECTED });
     // Alarm scheduled with the survives-SW-death period:
     expect(mock.alarms.created[RECONNECT_ALARM]).toEqual({ periodInMinutes: 0.5 });
-    expect(mock.storage.claudeBrowserStatus).toMatchObject({ state: 'reconnecting' });
+    expect(mock.storage.browpilotStatus).toMatchObject({ state: 'reconnecting' });
     // setTimeout retry also scheduled: advancing 5s constructs a brand-new socket.
     const before = FakeWebSocket.instances.length;
     await vi.advanceTimersByTimeAsync(5000);
@@ -120,7 +120,7 @@ describe('Transport', () => {
     const ws = FakeWebSocket.latest();
     ws.emitClose(); // broker down / no Claude session: socket never opened
     await vi.advanceTimersByTimeAsync(0);
-    expect(mock.storage.claudeBrowserStatus).toMatchObject({ state: 'waiting' });
+    expect(mock.storage.browpilotStatus).toMatchObject({ state: 'waiting' });
   });
 
   it('sends a heartbeat ping at 30s and forces reconnect when no pong in 3s', async () => {

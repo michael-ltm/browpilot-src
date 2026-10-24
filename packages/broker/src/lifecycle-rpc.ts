@@ -1,4 +1,4 @@
-import { ErrorCode, Method, type JsonRpcMessage, type JsonRpcRequest } from '@claude-browser/shared';
+import { ErrorCode, Method, type JsonRpcMessage, type JsonRpcRequest } from '@browpilot/shared';
 import type { LocalBrowserManager } from './local/index.js';
 import type { Router } from './router.js';
 

@@ -41,4 +41,4 @@ Justify each permission against the submitted build. If dropping a legacy capabi
 
 Colors: navy `#0b1629`, teal `#2dd4bf`, off-white `#d9f5f1`. Icon: browser window and navigation arrow, without AI-vendor marks. Editable source: `packages/extension/icons/browpilot.svg`; PNGs: 16, 32, 48 and 128 pixels. Reproduce with ImageMagick, for example `magick -background none packages/extension/icons/browpilot.svg -resize 128x128 packages/extension/icons/icon128.png`.
 
-Display branding is Browpilot. The npm package remains `@john523100/claude-browser`, exposing both `browpilot` and `claude-browser` commands. Workspace package names and configuration keys remain stable. Check name availability and publisher identity in the target stores before submission.
+Display branding is Browpilot. The npm package is `@john523100/browpilot`, exposing the `browpilot` command. Workspace packages use the `@browpilot/` scope, and the companion configuration lives in `~/.browpilot`. Check name availability and publisher identity in the target stores before submission.

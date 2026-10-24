@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { tabsTools } from '../src/tools/tabs.js';
 import { createContext } from '../src/context.js';
-import { Method, ErrorCode } from '@claude-browser/shared';
+import { Method, ErrorCode } from '@browpilot/shared';
 import { RpcError } from '../src/client.js';
 import { registerAll } from '../src/tools/index.js';
 

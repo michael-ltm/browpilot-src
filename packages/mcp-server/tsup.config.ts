@@ -8,6 +8,6 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  noExternal: ['@claude-browser/shared'],
+  noExternal: ['@browpilot/shared', '@browpilot/launcher'],
   banner: { js: '#!/usr/bin/env node' },
 });

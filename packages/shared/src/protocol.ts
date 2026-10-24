@@ -85,5 +85,7 @@ export interface Config {
   storeUrls?: Partial<Record<'chrome' | 'edge' | 'chromium', string>>;
 }
 export const DEFAULT_PORT = 8787;
-export const CONFIG_DIR = '.claude-browser';   // under os.homedir()
+export const CONFIG_DIR = '.browpilot';   // under os.homedir()
+/** Pre-rename config dir, moved to CONFIG_DIR on first start. */
+export const LEGACY_CONFIG_DIR = '.claude-browser';
 export const CONFIG_FILE = 'config.json';

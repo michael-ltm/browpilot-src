@@ -3,6 +3,7 @@ import { homedir, platform } from 'node:os';
 import { join, resolve, basename, dirname, isAbsolute, sep } from 'node:path';
 import { mkdir, mkdtemp, readFile, lstat, realpath, unlink } from 'node:fs/promises';
 import WebSocket from 'ws';
+import { CONFIG_DIR } from '@browpilot/shared';
 
 export interface DeveloperTarget { targetId: string; type: string; title: string; url: string; [key: string]: unknown }
 export interface DeveloperEvent { sequence: number; time: number; method: string; params?: Record<string, unknown>; sessionId?: string; targetId?: string }
@@ -76,7 +77,7 @@ export class DeveloperBrowser {
     const deadline = Date.now() + STARTUP_TIMEOUT_MS;
     try {
       if (!options.executable || !isAbsolute(options.executable)) throw new Error('Absolute browser executable required');
-      const base = join(homedir(), '.claude-browser', 'developer-profiles');
+      const base = join(homedir(), CONFIG_DIR, 'developer-profiles');
       await mkdir(base, { recursive: true }); this.current(attempt);
       // Generated profiles are intentionally retained for subsequent debugging sessions.
       const userDataDir = options.userDataDir ? resolve(options.userDataDir) : await mkdtemp(join(base, 'profile-'));

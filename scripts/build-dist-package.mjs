@@ -1,4 +1,4 @@
-// Assembles the publishable `claude-browser` package into dist-pkg/:
+// Assembles the publishable `browpilot` package into dist-pkg/:
 //   dist/mcp.js   (bin; MCP server, shared bundled, sdk/ws/zod external)
 //   dist/broker.js(broker, shared bundled, ws external)
 //   extension/    (built extension dist)
@@ -12,8 +12,8 @@ const OUT = 'dist-pkg';
 const EXTERNAL = ['@modelcontextprotocol/sdk', 'ws', 'zod'];
 
 // 1. Build the extension (its dist is copied verbatim).
-execSync('npm run build -w @claude-browser/shared', { stdio: 'inherit' });
-execSync('npm run build -w @claude-browser/extension', { stdio: 'inherit' });
+execSync('npm run build -w @browpilot/shared', { stdio: 'inherit' });
+execSync('npm run build -w @browpilot/extension', { stdio: 'inherit' });
 
 // 2. Fresh output dir.
 rmSync(OUT, { recursive: true, force: true });
@@ -43,13 +43,13 @@ cpSync('packages/extension/dist', `${OUT}/extension`, {
 // 5. package.json — version from root, deps from mcp-server.
 const root = JSON.parse(readFileSync('package.json', 'utf8'));
 const mcpPkg = JSON.parse(readFileSync('packages/mcp-server/package.json', 'utf8'));
-// Filter out workspace-internal packages (version "*" or "@claude-browser/" scope):
+// Filter out workspace-internal packages (version "*" or "@browpilot/" scope):
 // esbuild inlines them, so they are not runtime deps of the published package.
-// Leaving them in would cause `npm install claude-browser` to fail because those
+// Leaving them in would cause `npm install browpilot` to fail because those
 // packages are private and never published to npm.
 const publishDeps = Object.fromEntries(
   Object.entries(mcpPkg.dependencies ?? {}).filter(
-    ([name, ver]) => ver !== '*' && !name.startsWith('@claude-browser/'),
+    ([name, ver]) => ver !== '*' && !name.startsWith('@browpilot/'),
   ),
 );
 writeFileSync(
@@ -59,4 +59,4 @@ writeFileSync(
 // 6. README for the npm page.
 cpSync('docs/release-README.md', `${OUT}/README.md`);
 cpSync('LICENSE', `${OUT}/LICENSE`);
-console.log(`Assembled ${OUT}/ (Browpilot ${root.version}; legacy npm package retained)`);
+console.log(`Assembled ${OUT}/ (Browpilot ${root.version})`);

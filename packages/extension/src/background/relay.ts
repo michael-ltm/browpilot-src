@@ -4,7 +4,7 @@ import {
   type ExecuteCdpResult,
   type OnCdpEventParams,
   Notif,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 import { IdleDetacher } from './idle';
 
 /** Minimal surface of Transport that the relay needs (kept narrow for testability). */

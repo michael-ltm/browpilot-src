@@ -21,7 +21,7 @@ import {
   type GetEventsParams,
   type GetEventsResult,
   type CdpEvent,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 import { ConsoleBuffer } from './buffer.js';
 import { EventBuffer } from './event-buffer.js';
 import type { ProfileRegistry } from './profiles.js';

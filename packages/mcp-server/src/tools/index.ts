@@ -1,5 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ErrorCode, type AmbiguousProfileData } from '@claude-browser/shared';
+import { ErrorCode, type AmbiguousProfileData } from '@browpilot/shared';
 import type { ToolContext } from '../context.js';
 import { textResult, type ToolDef } from './types.js';
 import { RpcError } from '../client.js';
@@ -16,6 +16,7 @@ import { debuggerTools } from './debugger.js';
 import { instanceTools } from './instances.js';
 import { developerTools } from './developer.js';
 import { guardProfile, acceptProfileResult } from '../profile-guard.js';
+import { detectTools } from './detect.js';
 
 /** Every v1 browser_* tool, in a stable order. */
 export const allTools: ToolDef[] = [
@@ -31,6 +32,7 @@ export const allTools: ToolDef[] = [
   ...debuggerTools,
   ...instanceTools,
   ...developerTools,
+  ...detectTools,
 ];
 
 /** Agent-facing guidance returned when multiple profiles are connected and none is selected. */

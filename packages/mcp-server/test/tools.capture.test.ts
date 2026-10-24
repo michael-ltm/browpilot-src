@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Method } from '@claude-browser/shared';
+import { Method } from '@browpilot/shared';
 import { powerTools } from '../src/tools/power.js';
 import { networkTools } from '../src/tools/network.js';
 import { sourcesTools } from '../src/tools/sources.js';

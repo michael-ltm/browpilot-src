@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { DEFAULT_PORT, type Config } from '@claude-browser/shared';
+import { DEFAULT_PORT, type Config } from '@browpilot/shared';
 
 export interface EnsureConfigResult {
   created: boolean;

@@ -16,7 +16,7 @@ describe('bootstrap', () => {
     writeFileSync(join(extDir, 'manifest.json'), JSON.stringify({ key: Buffer.from('k').toString('base64') }));
 
     ensureConfig(extDir, home);
-    const cfgPath = join(home, '.claude-browser', 'config.json');
+    const cfgPath = join(home, '.browpilot', 'config.json');
     expect(existsSync(cfgPath)).toBe(true);
     const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
     expect(cfg.port).toBe(8787);
@@ -30,8 +30,8 @@ describe('bootstrap', () => {
 
   it('ensureConfig is a no-op (no extDir needed) when config already exists', () => {
     const home = mkdtempSync(join(tmpdir(), 'cb-home2-'));
-    mkdirSync(join(home, '.claude-browser'), { recursive: true });
-    const cfgPath = join(home, '.claude-browser', 'config.json');
+    mkdirSync(join(home, '.browpilot'), { recursive: true });
+    const cfgPath = join(home, '.browpilot', 'config.json');
     writeFileSync(cfgPath, JSON.stringify({ port: 9999, token: 'x'.repeat(64), extensionId: 'a'.repeat(32) }));
     expect(() => ensureConfig(null, home)).not.toThrow();
     expect(JSON.parse(readFileSync(cfgPath, 'utf8')).port).toBe(9999);
@@ -42,7 +42,7 @@ describe('bootstrap', () => {
     const extDir = mkdtempSync(join(tmpdir(), 'cb-ext3-'));
     const key = Buffer.from('k2').toString('base64');
     writeFileSync(join(extDir, 'manifest.json'), JSON.stringify({ key }));
-    const cfgDir = join(home, '.claude-browser');
+    const cfgDir = join(home, '.browpilot');
     mkdirSync(cfgDir, { recursive: true });
     const cfgPath = join(cfgDir, 'config.json');
     const token = 'a1'.repeat(32); // 64 hex chars — a valid existing token

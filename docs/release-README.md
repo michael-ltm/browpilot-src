@@ -14,7 +14,7 @@ browpilot install codex
 # Or: browpilot install claude
 ```
 
-Restart your MCP client after registration. If its CLI is unavailable, use `browpilot config codex` or `browpilot config claude` and copy the generated configuration into your client settings. Both `browpilot` and the legacy `claude-browser` command are provided.
+Restart your MCP client after registration. If its CLI is unavailable, use `browpilot config codex` or `browpilot config claude` and copy the generated configuration into your client settings. The package provides the `browpilot` command; the legacy `claude-browser` command was removed in 0.2.2.
 
 ## Install and connect the extension
 
@@ -27,7 +27,7 @@ Browpilot 0.2.1 removes unused permissions identified during Chrome review. Vers
 
 For a custom installation, use `browser_register_instance` with its executable, user-data directory and profile directory. Installed, enabled and connected are separate states. Once paired, calls to a selected offline profile can reopen it. Refresh tabs and snapshots after restart; old tab IDs and element references can no longer be trusted. Already-dispatched mutations are never automatically replayed.
 
-`browser_install_extension` opens a configured store page or the browser's extension settings; installation requires confirmation in the browser. The assigned Chrome Store ID `kglhakgapoegbnnbobnmnebmbljehcid` is included in the companion defaults; additional store IDs can be configured in its allowlist. Configuration is retained at `~/.claude-browser/config.json` for upgrade compatibility.
+`browser_install_extension` opens a configured store page or the browser's extension settings; installation requires confirmation in the browser. The assigned Chrome Store ID `kglhakgapoegbnnbobnmnebmbljehcid` is included in the companion defaults; additional store IDs can be configured in its allowlist. Configuration is stored at `~/.browpilot/config.json`; an existing `~/.claude-browser` directory is moved there on first start.
 
 ## Grok and other remote clients
 

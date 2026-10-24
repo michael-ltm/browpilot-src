@@ -8,9 +8,9 @@ import { connectStdioSession } from './stdio.js';
 import { loadConfig } from './load-config.js';
 import { ensureConfig } from './bootstrap.js';
 import { BrokerClient } from './client.js';
-import { createContext } from './context.js';
+import { createContext, type ContextOptions } from './context.js';
 import { registerAll } from './tools/index.js';
-import { parseCommand, clientRegistration, clientConfig, type Command } from './cli.js';
+import { parseCommand, clientRegistration, clientConfig, legacyRemoval, type Command } from './cli.js';
 import { startHttpMcp } from './http.js';
 
 // R4: re-export BrokerClient for M5 harness
@@ -26,8 +26,11 @@ export interface McpToolRegistrar {
 }
 
 /** R4: Factor the context-builder out of main() so M5 harness can reuse it. */
-export function makeToolContext(client: BrokerClient): ReturnType<typeof createContext> {
-  return createContext(client);
+export function makeToolContext(
+  client: BrokerClient,
+  opts: ContextOptions = {},
+): ReturnType<typeof createContext> {
+  return createContext(client, opts);
 }
 
 /** R4: Thin wrapper — create + connect a BrokerClient. */
@@ -48,8 +51,12 @@ export async function createClient(opts: {
 /** R4: Thin wrapper — register all tools on an McpServer using a pre-built client.
  *  Accepts McpToolRegistrar so test harnesses can pass a capture-sink directly,
  *  without a double-escape cast. McpServer satisfies this interface. */
-export function registerTools(server: McpToolRegistrar, client: BrokerClient): void {
-  registerAll(server as McpServer, makeToolContext(client));
+export function registerTools(
+  server: McpToolRegistrar,
+  client: BrokerClient,
+  opts: ContextOptions = {},
+): void {
+  registerAll(server as McpServer, makeToolContext(client, opts));
 }
 
 export type CliCommand = Command;
@@ -76,10 +83,11 @@ function readPackageVersion(here: string): string {
 }
 
 async function main(httpPort?: number): Promise<void> {
-  // First-run bootstrap (npx flow): write ~/.claude-browser/config.json if absent,
+  // First-run bootstrap (npx flow): write ~/.browpilot/config.json if absent,
   // deriving extensionId from the bundled extension manifest. No-op if it exists.
   const here = dirname(fileURLToPath(import.meta.url));
-  ensureConfig(resolveExtensionDir(here));
+  const extensionDir = resolveExtensionDir(here);
+  ensureConfig(extensionDir);
   const config = loadConfig();
 
   const session = () => {
@@ -92,7 +100,7 @@ async function main(httpPort?: number): Promise<void> {
   const server = new McpServer({ name: 'browpilot', version: readPackageVersion(here) }, {
     instructions: 'Browpilot controls user-selected browser profiles. Use browser_list_instances to discover installed browsers and browser_open_instance to launch/pair one. Use browser_get_tabs and a fresh browser_snapshot after reconnect or restart. Do not replay a mutation whose outcome is unknown. Developer tools use a separate debugging session. Installation requires confirmation in the browser.',
   });
-  const ctx = makeToolContext(client);
+  const ctx = makeToolContext(client, { extensionId: config.extensionId, extensionDir });
   registerAll(server, ctx);
 
   // Connect to the broker in the background: spawns it detached if down, then
@@ -142,7 +150,7 @@ if (isEntry) {
   const here = dirname(fileURLToPath(import.meta.url));
   if (cmd.kind === 'mcp' || cmd.kind === 'http') {
     main(cmd.kind === 'http' ? cmd.port : undefined).catch((err) => {
-      process.stderr.write(`claude-browser-mcp fatal: ${(err as Error).message}\n`);
+      process.stderr.write(`browpilot-mcp fatal: ${(err as Error).message}\n`);
       process.exit(1);
     });
   } else if (cmd.kind === 'extension-path') {
@@ -150,7 +158,10 @@ if (isEntry) {
     if (dir) process.stdout.write(dir + '\n');
     else { process.stderr.write('extension dir not found\n'); process.exit(1); }
   } else if (cmd.kind === 'install') {
-    const registration = clientRegistration(cmd.client ?? 'claude', fileURLToPath(import.meta.url));
+    const client = cmd.client ?? 'claude';
+    const legacy = legacyRemoval(client);
+    spawnSync(legacy.command, legacy.args, { stdio: 'ignore' });
+    const registration = clientRegistration(client, fileURLToPath(import.meta.url));
     const r = spawnSync(registration.command, registration.args, { stdio: 'inherit' });
     if (r.error) process.stderr.write(`Could not register Browpilot: ${r.error.message}\n`);
     process.exit(r.status ?? 1);

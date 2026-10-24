@@ -5,7 +5,7 @@ const FIXTURE_HTML = `<!doctype html>
 <html>
   <head><meta charset="utf-8"><title>CB Fixture</title></head>
   <body>
-    <h1 id="heading">Claude Browser Fixture</h1>
+    <h1 id="heading">Browpilot Fixture</h1>
     <button id="go">Go</button>
     <input id="name" type="text" aria-label="Name" />
     <p id="result">idle</p>

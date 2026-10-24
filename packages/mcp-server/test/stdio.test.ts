@@ -1,7 +1,7 @@
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ErrorCode, Method, type JsonRpcRequest } from '@claude-browser/shared';
+import { ErrorCode, Method, type JsonRpcRequest } from '@browpilot/shared';
 import { Router } from '../../broker/src/router.js';
 import { ProfileRegistry } from '../../broker/src/profiles.js';
 import { connectStdioSession } from '../src/stdio.js';

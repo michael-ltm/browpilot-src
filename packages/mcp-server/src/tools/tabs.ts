@@ -6,7 +6,7 @@ import {
   type NewTabResult,
   type SwitchTabParams,
   type CloseTabParams,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 import { defineTool, textResult, type ToolDef, type ToolResult } from './types.js';
 import { profileParam } from '../context.js';
 

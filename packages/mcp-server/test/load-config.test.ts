@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseConfig } from '../src/load-config.js';
-import { DEFAULT_PORT } from '@claude-browser/shared';
+import { DEFAULT_PORT } from '@browpilot/shared';
 
 describe('parseConfig', () => {
   it('reads port/token/extensionId from valid JSON', () => {

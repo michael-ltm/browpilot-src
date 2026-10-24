@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { profileTools } from '../src/tools/profiles.js';
 import { createContext } from '../src/context.js';
-import { Method } from '@claude-browser/shared';
+import { Method } from '@browpilot/shared';
 
 function fakeClient(responses: Record<string, unknown>) {
   const calls: Array<[string, unknown]> = [];

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrokerClient, type ClientSocket } from '../src/client.js';
-import { Method, ErrorCode, Notif, type JsonRpcMessage } from '@claude-browser/shared';
+import { Method, ErrorCode, Notif, type JsonRpcMessage } from '@browpilot/shared';
 
 class FakeSocket implements ClientSocket {
   sent: string[] = [];

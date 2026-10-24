@@ -34,8 +34,8 @@ jobs:
       # shared must build first — the extension bundles it.
       - name: Build extension
         run: |
-          npm run build -w @claude-browser/shared
-          npm run build -w @claude-browser/extension
+          npm run build -w @browpilot/shared
+          npm run build -w @browpilot/extension
 
       - name: Resolve tag
         id: meta
@@ -44,7 +44,7 @@ jobs:
       - name: Package dist into a zip
         run: |
           cd packages/extension/dist
-          zip -r "$GITHUB_WORKSPACE/claude-browser-extension-${{ steps.meta.outputs.tag }}.zip" . \
+          zip -r "$GITHUB_WORKSPACE/browpilot-extension-${{ steps.meta.outputs.tag }}.zip" . \
             -x '*.map' '*.tsbuildinfo'
 
       - name: Create or update the GitHub Release
@@ -52,7 +52,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
-          ASSET="claude-browser-extension-${TAG}.zip"
+          ASSET="browpilot-extension-${TAG}.zip"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$ASSET" --clobber
           else

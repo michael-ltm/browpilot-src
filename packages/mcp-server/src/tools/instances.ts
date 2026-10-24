@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { Method } from '@claude-browser/shared';
+import { Method, type LocalBrowserProfile } from '@browpilot/shared';
 import { defineTool, textResult, type ToolDef } from './types.js';
+import { launcherInstall } from './detect.js';
 
 export const instanceTools: ToolDef[] = [
   defineTool({ name: 'browser_list_instances', description: 'Discover local Chrome, Edge and Chromium profiles, including closed browsers. Shows extension installation separately from connection. Use browser_open_instance with the exact local id to pair and select one.', inputSchema: {},
@@ -19,8 +20,21 @@ export const instanceTools: ToolDef[] = [
       return textResult(JSON.stringify(result));
     },
   }),
-  defineTool({ name: 'browser_install_extension', description: 'Open the selected profile at its configured extension store page or unpacked-install settings. The user must confirm installation in the browser. Then call browser_open_instance to verify pairing.',
-    inputSchema: { id: z.string() },
-    async handler(args, ctx) { return textResult(JSON.stringify(await ctx.client.request(Method.INSTALL_LOCAL_EXTENSION, args))); },
+  defineTool({ name: 'browser_install_extension', description: 'Install the Browpilot extension into a profile. With a local id from browser_list_instances, opens its configured store page or unpacked-install settings; the user must confirm installation in the browser, then call browser_open_instance to verify pairing. Add allowRestart:true (ask the user first) to instead close and reopen that real profile and load the extension over the DevTools protocol where the browser allows it; this load lasts one browser session. Without an id, index/family pick an entry from browser_detect for the same controlled relaunch.',
+    inputSchema: {
+      id: z.string().optional(),
+      index: z.number().int().nonnegative().optional(),
+      family: z.enum(['chrome', 'edge', 'brave', 'chromium']).optional(),
+      profileDirectory: z.string().optional(),
+      allowRestart: z.boolean().optional(),
+    },
+    async handler({ id, index, family, profileDirectory, allowRestart }, ctx) {
+      if (id === undefined) return launcherInstall(ctx, { ...(index !== undefined ? { index } : {}), ...(family ? { family } : {}) }, { ...(profileDirectory ? { profileDirectory } : {}), ...(allowRestart !== undefined ? { allowRestart } : {}) });
+      if (allowRestart !== true) return textResult(JSON.stringify(await ctx.client.request(Method.INSTALL_LOCAL_EXTENSION, { id })));
+      const { profiles } = await ctx.client.request<{ profiles: LocalBrowserProfile[] }>(Method.LIST_LOCAL_INSTANCES, {});
+      const profile = profiles.find(p => p.id === id);
+      if (!profile) return { ...textResult(`no local instance with id ${id}; run browser_list_instances first`), isError: true };
+      return launcherInstall(ctx, { userDataDir: profile.userDataDir }, { profileDirectory: profileDirectory ?? profile.profileDirectory, allowRestart: true });
+    },
   }),
 ] as ToolDef[];

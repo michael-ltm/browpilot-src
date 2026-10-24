@@ -1,4 +1,4 @@
-import type { CdpEvent, GetEventsParams } from '@claude-browser/shared';
+import type { CdpEvent, GetEventsParams } from '@browpilot/shared';
 
 const DEFAULT_CAP = 5000;
 

@@ -4,16 +4,16 @@ import { renderLaunchdPlist, LAUNCHD_LABEL } from '../src/launchd.js';
 describe('renderLaunchdPlist', () => {
   const plist = renderLaunchdPlist({
     nodePath: '/usr/local/bin/node',
-    scriptPath: '/Users/x/.claude-browser/broker/dist/index.js',
+    scriptPath: '/Users/x/.browpilot/broker/dist/index.js',
   });
 
   it('exposes the fixed label', () => {
-    expect(LAUNCHD_LABEL).toBe('com.claude-browser.broker');
+    expect(LAUNCHD_LABEL).toBe('com.browpilot.broker');
   });
 
   it('declares the label key', () => {
     expect(plist).toContain('<key>Label</key>');
-    expect(plist).toContain('<string>com.claude-browser.broker</string>');
+    expect(plist).toContain('<string>com.browpilot.broker</string>');
   });
 
   it('sets KeepAlive and RunAtLoad to true', () => {
@@ -23,7 +23,7 @@ describe('renderLaunchdPlist', () => {
 
   it('lists node then the script in ProgramArguments', () => {
     const idxNode = plist.indexOf('/usr/local/bin/node');
-    const idxScript = plist.indexOf('/Users/x/.claude-browser/broker/dist/index.js');
+    const idxScript = plist.indexOf('/Users/x/.browpilot/broker/dist/index.js');
     expect(idxNode).toBeGreaterThan(-1);
     expect(idxScript).toBeGreaterThan(idxNode);
   });

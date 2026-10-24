@@ -2,7 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT, type Config } from '@claude-browser/shared';
+import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT, type Config } from '@browpilot/shared';
+import { migrateLegacyConfigDir } from '@browpilot/shared/node';
 
 /**
  * Chrome extension id from a manifest `key` (base64-encoded DER SubjectPublicKeyInfo):
@@ -10,7 +11,7 @@ import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT, type Config } from '@claude-brow
  */
 export function idFromManifestKey(manifestKey: string): string {
   const der = Buffer.from(manifestKey, 'base64');
-  if (der.length === 0) throw new Error('claude-browser: extension manifest key did not decode');
+  if (der.length === 0) throw new Error('browpilot: extension manifest key did not decode');
   const digest = createHash('sha256').update(der).digest().subarray(0, 16);
   let id = '';
   for (const byte of digest) {
@@ -36,7 +37,7 @@ function deriveExtensionId(extensionDir: string | null): string | null {
 
 /**
  * First-run + self-healing bootstrap for the npx / standalone flow. Ensures
- * ~/.claude-browser/config.json exists AND stays consistent with the bundled
+ * ~/.browpilot/config.json exists AND stays consistent with the bundled
  * extension:
  *   - missing or corrupt config        → written fresh
  *   - empty / invalid / mismatched id   → repaired (id re-derived from the
@@ -50,6 +51,7 @@ function deriveExtensionId(extensionDir: string | null): string | null {
  * failure (loadConfig throws on an empty id, crashing the MCP server).
  */
 export function ensureConfig(extensionDir: string | null, home: string = homedir()): void {
+  migrateLegacyConfigDir(home);
   const path = join(home, CONFIG_DIR, CONFIG_FILE);
   const derivedId = deriveExtensionId(extensionDir);
 
@@ -79,9 +81,9 @@ export function ensureConfig(extensionDir: string | null, home: string = homedir
   const extensionId = derivedId ?? existingId;
   if (!extensionId) {
     throw new Error(
-      'claude-browser: bundled extension not found and config has no valid extensionId — ' +
+      'browpilot: bundled extension not found and config has no valid extensionId — ' +
         'cannot pin the extension id. Run from the published package, or build the extension ' +
-        '(npm run build -w @claude-browser/extension).',
+        '(npm run build -w @browpilot/extension).',
     );
   }
 

@@ -4,11 +4,11 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch, type LaunchedChrome } from 'chrome-launcher';
 import { readPinnedExtensionId } from '../../scripts/lib/manifest.js';
-import { DEFAULT_PORT, Method, type Config } from '@claude-browser/shared';
+import { DEFAULT_PORT, Method, type Config } from '@browpilot/shared';
 // R1: Broker exposes an in-process server factory via `startServer` (not `createServer`).
 // R4: client + tool registration come from the mcp-server package.
-import { startServer, type BrokerServer } from '@claude-browser/broker';
-import { createClient, registerTools, type BrokerClient, type McpToolRegistrar } from '@claude-browser/mcp-server';
+import { startServer, type BrokerServer } from '@browpilot/broker';
+import { createClient, registerTools, type BrokerClient, type McpToolRegistrar } from '@browpilot/mcp-server';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(here, '..', '..');
@@ -51,7 +51,7 @@ export async function startHarness(): Promise<Harness> {
   const extensionId = await readPinnedExtensionId(extensionDist);
   const token = 'integration-test-token-0000000000000000000000000000000000000000';
 
-  // R1: use startServer (canonical export from @claude-browser/broker).
+  // R1: use startServer (canonical export from @browpilot/broker).
   // Bind to DEFAULT_PORT: a freshly loaded extension has empty chrome.storage and
   // dials DEFAULT_PORT, so the broker MUST listen there for the extension to find
   // it (an ephemeral port would never be discovered by the extension).

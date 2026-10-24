@@ -1,8 +1,10 @@
 import { join } from 'node:path';
-import { CONFIG_DIR, CONFIG_FILE } from '@claude-browser/shared';
+import { CONFIG_DIR, CONFIG_FILE } from '@browpilot/shared';
 
 /** Matches the Label in broker/src/launchd.ts. */
-export const LAUNCHD_LABEL = 'com.claude-browser.broker';
+export const LAUNCHD_LABEL = 'com.browpilot.broker';
+/** Label used before the Browpilot rename; uninstall removes it too. */
+export const LEGACY_LAUNCHD_LABEL = 'com.claude-browser.broker';
 
 export interface ResolvedPaths {
   repoRoot: string;
@@ -14,6 +16,7 @@ export interface ResolvedPaths {
   brokerEntry: string;
   mcpServerEntry: string;
   plistPath: string;
+  legacyPlistPath: string;
 }
 
 /**
@@ -32,5 +35,6 @@ export function resolvePaths(repoRoot: string, home: string): ResolvedPaths {
     brokerEntry: join(repoRoot, 'packages', 'broker', 'dist', 'index.js'),
     mcpServerEntry: join(repoRoot, 'packages', 'mcp-server', 'dist', 'index.js'),
     plistPath: join(home, 'Library', 'LaunchAgents', `${LAUNCHD_LABEL}.plist`),
+    legacyPlistPath: join(home, 'Library', 'LaunchAgents', `${LEGACY_LAUNCHD_LABEL}.plist`),
   };
 }

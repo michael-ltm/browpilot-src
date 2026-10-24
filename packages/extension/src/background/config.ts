@@ -1,6 +1,6 @@
-import { DEFAULT_PORT } from '@claude-browser/shared';
+import { DEFAULT_PORT } from '@browpilot/shared';
 
-export const PORT_KEY = 'claudeBrowserPort';
+export const PORT_KEY = 'browpilotPort';
 
 /** Resolve the broker port from storage override, falling back to DEFAULT_PORT. */
 export async function resolvePort(): Promise<number> {
@@ -13,10 +13,10 @@ export function resolveExtensionId(): string {
   return chrome.runtime.id;
 }
 
-export const INSTANCE_ID_KEY = 'claudeBrowserInstanceId';
-export const LABEL_KEY = 'claudeBrowserLabel';
+export const INSTANCE_ID_KEY = 'browpilotInstanceId';
+export const LABEL_KEY = 'browpilotLabel';
 
-export const IDLE_DETACH_MIN_KEY = 'claudeBrowserIdleDetachMin';
+export const IDLE_DETACH_MIN_KEY = 'browpilotIdleDetachMin';
 /** Minutes of CDP inactivity before the debugger auto-detaches (0 = never). */
 export const DEFAULT_IDLE_DETACH_MIN = 30;
 
@@ -62,4 +62,32 @@ export async function getLabel(instanceId: string): Promise<string> {
   const email = await getProfileEmailName();
   if (email) return email;
   return `Profile ${instanceId.slice(0, 4)}`;
+}
+
+/** Pre-rename storage keys and the keys that replaced them. */
+const LEGACY_KEYS: Record<string, string> = {
+  claudeBrowserPort: PORT_KEY,
+  claudeBrowserInstanceId: INSTANCE_ID_KEY,
+  claudeBrowserLabel: LABEL_KEY,
+  claudeBrowserIdleDetachMin: IDLE_DETACH_MIN_KEY,
+  claudeBrowserStatus: 'browpilotStatus',
+};
+const LEGACY_ALARMS = ['claude-browser-reconnect', 'claude-browser-keepalive'];
+
+/**
+ * Carry settings stored under the claude-browser keys over to the Browpilot
+ * keys, keeping the instance id (and so the profile pairing) stable. Values
+ * already present under a new key win. Old periodic alarms are cleared so they
+ * stop waking the worker.
+ */
+export async function migrateLegacyStorage(): Promise<void> {
+  const got = (await chrome.storage.local.get([...Object.keys(LEGACY_KEYS), ...Object.values(LEGACY_KEYS)])) as Record<string, unknown>;
+  const legacy = Object.keys(LEGACY_KEYS).filter((k) => k in got);
+  if (legacy.length > 0) {
+    const moved: Record<string, unknown> = {};
+    for (const k of legacy) if (!(LEGACY_KEYS[k]! in got)) moved[LEGACY_KEYS[k]!] = got[k];
+    if (Object.keys(moved).length > 0) await chrome.storage.local.set(moved);
+    await chrome.storage.local.remove(legacy);
+  }
+  await Promise.all(LEGACY_ALARMS.map((name) => chrome.alarms.clear(name)));
 }

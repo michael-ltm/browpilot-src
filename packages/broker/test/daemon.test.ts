@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { Config } from '@claude-browser/shared';
+import type { Config } from '@browpilot/shared';
 import { runBrokerDaemon } from '../src/index.js';
 import type { BrokerServer } from '../src/server.js';
 

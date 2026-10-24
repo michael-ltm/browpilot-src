@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { visionTools } from '../src/tools/vision.js';
 import { createContext, type ToolContext } from '../src/context.js';
 import { FakeClient } from './helpers/fake-client.js';
-import { Method } from '@claude-browser/shared';
+import { Method } from '@browpilot/shared';
 
 function toolByName(name: string) {
   const t = visionTools.find((d) => d.name === name);

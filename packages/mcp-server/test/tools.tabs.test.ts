@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { tabsTools } from '../src/tools/tabs.js';
 import { createContext, type ToolContext } from '../src/context.js';
 import { FakeClient } from './helpers/fake-client.js';
-import { Method } from '@claude-browser/shared';
+import { Method } from '@browpilot/shared';
 
 function tool(name: string) {
   const t = tabsTools.find((d) => d.name === name);

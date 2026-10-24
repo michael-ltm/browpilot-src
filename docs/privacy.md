@@ -1,6 +1,6 @@
 # Browpilot privacy policy
 
-Effective version: 0.2.1. Browpilot was previously named claude-browser.
+Effective version: 0.2.2. Browpilot was previously named claude-browser.
 
 Browpilot connects a browser extension to a local companion so an AI client selected by you can operate browser profiles and inspect pages. The companion and extension have no built-in hosted data collection service or analytics.
 
@@ -14,7 +14,7 @@ The companion reads browser installation paths, profile directories and extensio
 
 ## Storage and transfers
 
-Extension identity, labels, settings and status use browser local extension storage. Companion configuration and catalog are under `.claude-browser` in your home directory. Console and protocol-event buffers are bounded and held in process memory. Dedicated developer profiles are retained under `.claude-browser/developer-profiles` unless you select another directory.
+Extension identity, labels, settings and status use browser local extension storage. Companion configuration and catalog are under `.browpilot` in your home directory. Console and protocol-event buffers are bounded and held in process memory. Dedicated developer profiles are retained under `.browpilot/developer-profiles` unless you select another directory.
 
 Tool results are sent to the MCP client you connect. That client and its AI provider may process, store or transmit them under their own policies. Remote HTTP MCP uses your configured tunnel/proxy, whose operator can process traffic under its policies. Browpilot has no built-in sale of data, advertising, third-party analytics or model-training collection. These statements do not describe your AI provider's practices.
 

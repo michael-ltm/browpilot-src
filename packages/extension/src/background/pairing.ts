@@ -1,4 +1,4 @@
-import { Method } from '@claude-browser/shared';
+import { Method } from '@browpilot/shared';
 import type { Transport } from './transport';
 
 export function pairingNonce(url: string | undefined, extensionId: string): string | null {

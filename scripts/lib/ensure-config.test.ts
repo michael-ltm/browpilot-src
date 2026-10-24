@@ -3,14 +3,14 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ensureConfig } from './ensure-config.js';
-import { DEFAULT_PORT, type Config } from '@claude-browser/shared';
+import { DEFAULT_PORT, type Config } from '@browpilot/shared';
 
 let dir: string;
 let configFile: string;
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'cb-cfg-'));
-  configFile = join(dir, '.claude-browser', 'config.json');
+  configFile = join(dir, '.browpilot', 'config.json');
 });
 
 afterEach(async () => {
@@ -32,7 +32,7 @@ describe('ensureConfig', () => {
   });
 
   it('preserves existing token and port but refreshes extensionId', async () => {
-    await mkdir(join(dir, '.claude-browser'), { recursive: true });
+    await mkdir(join(dir, '.browpilot'), { recursive: true });
     const existing: Config = { port: 9999, token: 'deadbeef'.repeat(8), extensionId: 'oldoldoldoldoldoldoldoldoldoldol' };
     await writeFile(configFile, JSON.stringify(existing), 'utf8');
 

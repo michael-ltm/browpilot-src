@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ConsoleEntry } from '@claude-browser/shared';
+import type { ConsoleEntry } from '@browpilot/shared';
 import { ConsoleBuffer } from '../src/buffer.js';
 
 function entry(tabId: number, text: string, timestamp: number, level = 'log'): ConsoleEntry {

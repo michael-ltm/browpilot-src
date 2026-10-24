@@ -30,6 +30,11 @@ export function clientRegistration(client: ClientName, entry: string, node: stri
   return { command: client, args: ['mcp', 'add', 'browpilot', '--', node, entry] };
 }
 
+/** Drop a registration left by the pre-rename `claude-browser` name; failure just means there was none. */
+export function legacyRemoval(client: ClientName) {
+  return { command: client, args: ['mcp', 'remove', 'claude-browser'] };
+}
+
 export function clientConfig(client: ClientName, entry: string, node: string = process.execPath): string {
   if (client === 'codex') return `[mcp_servers.browpilot]\ncommand = ${JSON.stringify(node)}\nargs = [${JSON.stringify(entry)}]\n`;
   return JSON.stringify({ mcpServers: { browpilot: { command: node, args: [entry] } } }, null, 2) + '\n';

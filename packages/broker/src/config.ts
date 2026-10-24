@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT, type Config } from '@claude-browser/shared';
+import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT, type Config } from '@browpilot/shared';
+import { migrateLegacyConfigDir } from '@browpilot/shared/node';
 import { withReleaseDefaults } from './release-config.js';
 
 /** Absolute path to the broker config file. `home` is injectable for tests. */
@@ -31,6 +32,7 @@ function isConfig(value: unknown): value is Config {
  * Idempotent: an existing config is returned untouched so the token is stable.
  */
 export function ensureConfig(extensionId: string, home: string = homedir()): Config {
+  migrateLegacyConfigDir(home);
   const path = configPath(home);
   if (existsSync(path)) {
     return withReleaseDefaults(loadRaw(path));
@@ -54,6 +56,7 @@ function loadRaw(path: string): Config {
  * Throws if the file is absent or malformed.
  */
 export function loadConfig(home: string = homedir()): Config {
+  migrateLegacyConfigDir(home);
   const path = configPath(home);
   if (!existsSync(path)) {
     throw new Error(`Config not found at ${path}; run install first`);

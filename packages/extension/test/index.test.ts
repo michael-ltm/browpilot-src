@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { installChromeMock, installFakeWebSocket, type ChromeMock } from './chromeMock';
-import { Method } from '@claude-browser/shared';
+import { Method } from '@browpilot/shared';
 import { RECONNECT_ALARM, KEEPALIVE_ALARM, KEEPALIVE_PERIOD_MIN } from '../src/background/transport';
 import { IDLE_DETACH_MIN_KEY } from '../src/background/config';
 

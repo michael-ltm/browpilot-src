@@ -4,7 +4,7 @@ import {
   type ListProfilesResult,
   type ProfileInfo,
   type GetProfileLogsResult,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 import { defineTool, textResult, type ToolDef, type ToolResult } from './types.js';
 
 function fmt(p: ProfileInfo): string {

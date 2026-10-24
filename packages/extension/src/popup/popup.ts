@@ -1,4 +1,4 @@
-import { type OnStatusParams } from '@claude-browser/shared';
+import { type OnStatusParams } from '@browpilot/shared';
 import { STATUS_KEY } from '../background/transport';
 import { LABEL_KEY, IDLE_DETACH_MIN_KEY, DEFAULT_IDLE_DETACH_MIN } from '../background/config';
 import { getInstanceId, getLabel, resolveIdleDetachMin } from '../background/config';
@@ -42,7 +42,7 @@ async function render(): Promise<void> {
   if (dot && text) {
     const got = await chrome.storage.local.get(STATUS_KEY);
     const status = (got as Record<string, unknown>)[STATUS_KEY] as
-      | import('@claude-browser/shared').OnStatusParams
+      | import('@browpilot/shared').OnStatusParams
       | undefined;
     const view = statusDisplay(status);
     dot.style.background = view.color;

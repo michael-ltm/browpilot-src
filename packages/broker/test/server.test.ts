@@ -11,7 +11,7 @@ import {
   type JsonRpcMessage,
   type JsonRpcSuccess,
   type JsonRpcErrorResponse,
-} from '@claude-browser/shared';
+} from '@browpilot/shared';
 import { startServer, type BrokerServer } from '../src/server.js';
 import { RELEASED_CHROME_EXTENSION_ID } from '../src/release-config.js';
 
