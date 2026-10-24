@@ -1,5 +1,5 @@
 /**
- * Animated agent cursor overlay. Injected into the page via chrome.scripting.
+ * Legacy animated cursor overlay. No active injection path uses this module.
  * Positioned with transform translate3d for GPU-accelerated, layout-free moves.
  * Exposes window.__claudeBrowserCursor.moveTo(x, y) so the relay can drive it.
  */

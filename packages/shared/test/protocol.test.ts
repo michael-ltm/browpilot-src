@@ -18,6 +18,8 @@ import {
 describe('Method constant wire values', () => {
   it('maps every method name to its exact wire string', () => {
     expect(Method).toEqual({
+      LIST_LOCAL_INSTANCES: 'listLocalInstances', REGISTER_LOCAL_INSTANCE: 'registerLocalInstance',
+      ENSURE_LOCAL_INSTANCE: 'ensureLocalInstance', INSTALL_LOCAL_EXTENSION: 'installLocalExtension', PAIR_LOCAL_PROFILE: 'pairLocalProfile',
       EXECUTE_CDP: 'executeCdp',
       GET_TABS: 'getTabs',
       NEW_TAB: 'newTab',

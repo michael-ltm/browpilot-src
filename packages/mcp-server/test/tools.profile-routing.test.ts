@@ -10,7 +10,7 @@ const getTabs = () => tabsTools.find((t) => t.name === 'browser_get_tabs')!;
 describe('profile routing in existing tools', () => {
   it('injects selectedBrowserId into the request params', async () => {
     const calls: any[] = [];
-    const ctx = createContext({ request: async (m: string, p?: unknown) => { calls.push([m, p]); return { tabs: [] }; } });
+    const ctx = createContext({ request: async <R>(m: string, p?: unknown): Promise<R> => { calls.push([m, p]); return { tabs: [] } as R; } });
     ctx.selectedBrowserId = 'b9';
     await getTabs().handler({}, ctx);
     expect(calls[0][0]).toBe(Method.GET_TABS);
@@ -19,7 +19,7 @@ describe('profile routing in existing tools', () => {
 
   it('explicit profile arg overrides the selection', async () => {
     const calls: any[] = [];
-    const ctx = createContext({ request: async (_m: string, p?: unknown) => { calls.push(p); return { tabs: [] }; } });
+    const ctx = createContext({ request: async <R>(_m: string, p?: unknown): Promise<R> => { calls.push(p); return { tabs: [] } as R; } });
     ctx.selectedBrowserId = 'b9';
     await getTabs().handler({ profile: 'other' }, ctx);
     expect(calls[0]).toMatchObject({ browserId: 'other' });

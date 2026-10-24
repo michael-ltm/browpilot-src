@@ -104,6 +104,7 @@ export function installChromeMock(): ChromeMock {
   const chromeObj = {
     runtime: {
       id: 'testextensionid',
+      onMessage: { addListener: vi.fn() },
       lastError: undefined as unknown,
       getPlatformInfo: vi.fn((cb?: (info: { os: string; arch: string }) => void) => {
         const info = { os: 'mac', arch: 'arm64' };
@@ -148,6 +149,8 @@ export function installChromeMock(): ChromeMock {
       onDetach: { addListener: vi.fn((l: ChromeMock['detachListeners'][number]) => detachListeners.push(l)) },
     },
     tabs: {
+      onUpdated: { addListener: vi.fn() },
+      reload: vi.fn(() => Promise.resolve()),
       query: vi.fn(() => Promise.resolve([] as chrome.tabs.Tab[])),
       create: vi.fn((props: chrome.tabs.CreateProperties) =>
         Promise.resolve({ id: 99, url: props.url, active: true, windowId: 1 } as chrome.tabs.Tab),

@@ -21,6 +21,19 @@ class ScriptedSocket implements ClientSocket {
 }
 
 describe('BrokerClient.connectWithRetry', () => {
+  it('settles a pending retry on close and never creates another socket', async () => {
+    const sockets: ScriptedSocket[] = [];
+    let release!: () => void;
+    const client = new BrokerClient({ token: 't', sessionId: 's', socketFactory: () => { const s = new ScriptedSocket(); sockets.push(s); return s; }, spawnBroker: () => {}, delay: () => new Promise<void>(resolve => { release = resolve; }) });
+    const connection = client.connectWithRetry();
+    sockets[0]!.emit('error', new Error('offline'));
+    await vi.waitFor(() => expect(release).toBeDefined());
+    client.close();
+    await connection;
+    release(); await Promise.resolve(); await Promise.resolve();
+    expect(sockets).toHaveLength(1);
+    expect(client.isOpen).toBe(false);
+  });
   it('spawns the broker detached when the first connection is refused, then succeeds on retry', async () => {
     const sockets: ScriptedSocket[] = [];
     const spawnBroker = vi.fn();

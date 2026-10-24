@@ -13,6 +13,7 @@ const options = {
     background: resolve(here, 'src/background/index.ts'),
     cursor: resolve(here, 'src/content/cursor.ts'),
     popup: resolve(here, 'src/popup/popup.ts'),
+    pair: resolve(here, 'src/pair/pair.ts'),
   },
   outdir,
   bundle: true,
@@ -27,6 +28,7 @@ async function copyStatic() {
   await mkdir(outdir, { recursive: true });
   await cp(resolve(here, 'manifest.json'), resolve(outdir, 'manifest.json'));
   await cp(resolve(here, 'src/popup/popup.html'), resolve(outdir, 'popup.html'));
+  await cp(resolve(here, 'src/pair/pair.html'), resolve(outdir, 'pair.html'));
   await cp(resolve(here, 'icons'), resolve(outdir, 'icons'), { recursive: true });
 }
 

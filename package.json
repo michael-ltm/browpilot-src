@@ -1,8 +1,8 @@
 {
-  "name": "claude-browser",
+  "name": "browpilot",
   "private": true,
-  "version": "0.1.9",
-  "description": "Codex-style stable browser control for Claude Code",
+  "version": "0.2.1",
+  "description": "Browser MCP for AI agents: Codex, Claude Code and Grok",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -12,10 +12,12 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "build:package": "node --import tsx scripts/build-dist-package.mjs",
+    "build:store": "node --import tsx scripts/build-store.mjs",
     "test": "vitest run",
     "test:integration": "RUN_BROWSER_TESTS=1 vitest run --config vitest.integration.config.ts",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/broker/tsconfig.json && tsc --noEmit -p packages/mcp-server/tsconfig.json && npm run typecheck -w @claude-browser/extension",
     "clean": "rm -rf packages/*/dist",
     "install:browser": "tsx scripts/install.ts",
     "uninstall:browser": "tsx scripts/uninstall.ts"

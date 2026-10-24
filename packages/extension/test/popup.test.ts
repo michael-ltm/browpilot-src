@@ -14,10 +14,10 @@ describe('statusDisplay', () => {
     expect(statusDisplay({ state: 'disconnected' })).toEqual({ color: '#ef4444', label: 'Disconnected' });
   });
   it('maps waiting to a calm grey', () => {
-    expect(statusDisplay({ state: 'waiting' })).toEqual({ color: '#9ca3af', label: 'Waiting for Claude Code…' });
+    expect(statusDisplay({ state: 'waiting' })).toEqual({ color: '#9ca3af', label: 'Waiting for an AI client…' });
   });
   it('treats missing status as waiting (not yet connected, not an error)', () => {
-    expect(statusDisplay(undefined)).toEqual({ color: '#9ca3af', label: 'Waiting for Claude Code…' });
+    expect(statusDisplay(undefined)).toEqual({ color: '#9ca3af', label: 'Waiting for an AI client…' });
   });
   it('appends detail to the label when present', () => {
     expect(statusDisplay({ state: 'reconnecting', detail: 'broker down' })).toEqual({

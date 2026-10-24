@@ -16,9 +16,9 @@ export function makePackageManifest(version: string, dependencies: Record<string
   return {
     name: '@john523100/claude-browser',
     version,
-    description: 'Codex-style stable browser control for Claude Code (MCP server + broker + extension).',
+    description: 'Browpilot — Browser MCP for AI agents, with local profile discovery, startup and extension debugging.',
     type: 'module',
-    bin: { 'claude-browser': 'dist/mcp.js' },
+    bin: { 'claude-browser': 'dist/mcp.js', browpilot: 'dist/mcp.js' },
     files: ['dist', 'extension'],
     dependencies,
     engines: { node: '>=20' },

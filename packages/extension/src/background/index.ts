@@ -18,6 +18,7 @@ import {
 import { handleExecuteCdp, attach, detach, registerCdpEventForwarding, registerAutoReattach, checkIdle } from './relay';
 import { getTabs, newTab, switchTab, closeTab, getHistory } from './helpers';
 import { resolvePort, resolveExtensionId, getInstanceId, getLabel, resolveIdleDetachMin } from './config';
+import { registerPairing } from './pairing';
 
 /** Detach any debugger idle past the user's configured timeout (0 = never). */
 async function sweepIdle(): Promise<void> {
@@ -84,6 +85,7 @@ async function main(): Promise<void> {
   const instanceId = await getInstanceId();
   const label = await getLabel(instanceId);
   const transport = new Transport({ port, extensionId, instanceId, label });
+  registerPairing(transport);
   bootstrap(transport);
 }
 

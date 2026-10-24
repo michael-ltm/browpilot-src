@@ -88,6 +88,10 @@ export class BrokerClient {
   private brokerSpawned = false;
   private reconnecting = false;
   private destroyed = false;
+  private connectionTask?: Promise<void>;
+  private backoffTimer?: ReturnType<typeof setTimeout>;
+  private stopRetry!: () => void;
+  private readonly stopped = new Promise<void>(resolve => { this.stopRetry = resolve; });
 
   private socket: ClientSocket | null = null;
   private nextId = 1;
@@ -104,7 +108,7 @@ export class BrokerClient {
       ((url) => new WebSocket(url) as unknown as ClientSocket);
     this.spawnBroker = opts.spawnBroker ?? defaultSpawnBroker;
     this.delay =
-      opts.delay ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+      opts.delay ?? ((ms: number) => new Promise((r) => { this.backoffTimer = setTimeout(r, ms); }));
     this.baseBackoffMs = opts.baseBackoffMs ?? 200;
     this.maxBackoffMs = opts.maxBackoffMs ?? 5_000;
   }
@@ -121,13 +125,20 @@ export class BrokerClient {
    * Connect, retrying with capped backoff. On the first ECONNREFUSED, spawn the
    * broker detached (once). Resolves when the socket opens.
    */
-  async connectWithRetry(): Promise<void> {
+  connectWithRetry(): Promise<void> {
+    if (this.destroyed) return Promise.resolve();
+    if (!this.connectionTask) this.connectionTask = this.retryConnection().finally(() => { this.connectionTask = undefined; });
+    return this.connectionTask;
+  }
+
+  private async retryConnection(): Promise<void> {
     let attempt = 0;
-    for (;;) {
+    while (!this.destroyed) {
       try {
         await this.connectOnce();
         return;
       } catch (err) {
+        if (this.destroyed) return;
         const code = (err as { code?: string }).code;
         if (code === 'ECONNREFUSED' && !this.brokerSpawned) {
           this.brokerSpawned = true;
@@ -138,7 +149,7 @@ export class BrokerClient {
           this.maxBackoffMs,
         );
         attempt++;
-        await this.delay(backoff);
+        await Promise.race([this.delay(backoff), this.stopped]);
       }
     }
   }
@@ -149,7 +160,10 @@ export class BrokerClient {
       const socket = this.makeSocket(this.url);
       this.socket = socket;
       let settled = false;
+      let didOpen = false;
       socket.on('open', () => {
+        if (this.destroyed || this.socket !== socket) { socket.close(); return; }
+        didOpen = true;
         this.opened = true;
         const hello: AgentHello = {
           type: 'hello',
@@ -171,18 +185,24 @@ export class BrokerClient {
         }
       });
       socket.on('close', () => {
+        if (this.socket !== socket) return;
         this.handleClose();
+        if (!settled) {
+          settled = true;
+          reject(new RpcError(ErrorCode.EXTENSION_DISCONNECTED, 'closed before open'));
+          return;
+        }
         if (this.destroyed) {
           // Intentional teardown via close() — do not reconnect.
           return;
         }
-        if (settled && !this.reconnecting) {
+        if (didOpen && !this.reconnecting) {
           this.reconnecting = true;
           // Reset the spawn latch so that a subsequent ECONNREFUSED (e.g. the
           // broker crashed) will trigger a fresh spawn rather than looping forever
           // with no broker to connect to.
           this.brokerSpawned = false;
-          void this.connectWithRetry().finally(() => {
+          void this.connectWithRetry().catch(() => {}).finally(() => {
             this.reconnecting = false;
           });
         } else if (!settled) {
@@ -204,7 +224,7 @@ export class BrokerClient {
     params?: unknown,
     timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
   ): Promise<R> {
-    if (!this.socket) {
+    if (!this.socket || this.destroyed || !this.opened) {
       return Promise.reject(
         new RpcError(ErrorCode.EXTENSION_DISCONNECTED, 'not connected to broker'),
       );
@@ -227,7 +247,11 @@ export class BrokerClient {
 
   close(): void {
     this.destroyed = true;
+    this.stopRetry();
+    if (this.backoffTimer) clearTimeout(this.backoffTimer);
     this.socket?.close();
+    this.handleClose();
+    this.notificationListeners.clear();
   }
 
   private handleMessage(data: unknown): void {
@@ -240,6 +264,7 @@ export class BrokerClient {
             ? data.toString('utf8')
             : String(data);
       msg = JSON.parse(text) as JsonRpcMessage;
+      if (!msg || typeof msg !== 'object') return;
     } catch {
       return; // ignore unparseable frames
     }

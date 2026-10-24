@@ -13,7 +13,7 @@ export function statusDisplay(status: OnStatusParams | undefined): StatusView {
   const base: Record<OnStatusParams['state'], StatusView> = {
     connected: { color: '#22c55e', label: 'Connected' },
     reconnecting: { color: '#f59e0b', label: 'Reconnecting…' },
-    waiting: { color: '#9ca3af', label: 'Waiting for Claude Code…' },
+    waiting: { color: '#9ca3af', label: 'Waiting for an AI client…' },
     disconnected: { color: '#ef4444', label: 'Disconnected' },
   };
   const view = { ...base[state] };

@@ -13,6 +13,9 @@ import { powerTools } from './power.js';
 import { networkTools } from './network.js';
 import { sourcesTools } from './sources.js';
 import { debuggerTools } from './debugger.js';
+import { instanceTools } from './instances.js';
+import { developerTools } from './developer.js';
+import { guardProfile, acceptProfileResult } from '../profile-guard.js';
 
 /** Every v1 browser_* tool, in a stable order. */
 export const allTools: ToolDef[] = [
@@ -26,6 +29,8 @@ export const allTools: ToolDef[] = [
   ...networkTools,
   ...sourcesTools,
   ...debuggerTools,
+  ...instanceTools,
+  ...developerTools,
 ];
 
 /** Agent-facing guidance returned when multiple profiles are connected and none is selected. */
@@ -48,8 +53,12 @@ export function registerAll(server: McpServer, ctx: ToolContext): void {
       // An AMBIGUOUS_PROFILE error becomes a non-fatal native-picker guidance result.
       async (args: unknown) => {
         try {
-          return await tool.handler(args as never, ctx);
+          const checked = await guardProfile(tool.name, (args ?? {}) as Record<string, unknown>, ctx);
+          const result = await tool.handler(checked as never, ctx);
+          if (!result.isError) acceptProfileResult(tool.name, checked, ctx);
+          return result;
         } catch (e) {
+          if (e instanceof RpcError && e.code === ErrorCode.STALE_REF) ctx.refs.clear();
           if (e instanceof RpcError && e.code === ErrorCode.AMBIGUOUS_PROFILE) {
             return ambiguousGuidance(e.data as AmbiguousProfileData);
           }

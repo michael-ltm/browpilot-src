@@ -13,6 +13,7 @@ import {
   type JsonRpcErrorResponse,
 } from '@claude-browser/shared';
 import { startServer, type BrokerServer } from '../src/server.js';
+import { RELEASED_CHROME_EXTENSION_ID } from '../src/release-config.js';
 
 const config: Config = { port: 0, token: 'secret-token', extensionId: 'pinnedextid' };
 const ORIGIN = 'chrome-extension://pinnedextid';
@@ -64,6 +65,33 @@ async function connectBrowser(
 }
 
 describe('broker server', () => {
+  it('accepts the released Chrome Store ID by default only with the matching extension Origin', async () => {
+    server = await startServer(config);
+    const mismatch = new WebSocket(url(server), { headers: { Origin: `chrome-extension://${RELEASED_CHROME_EXTENSION_ID}` } });
+    await open(mismatch);
+    mismatch.send(JSON.stringify({ type: 'hello', role: 'browser', extensionId: 'pinnedextid', instanceId: 'bad', label: 'Bad' }));
+    expect(await new Promise<number>(resolve => mismatch.once('close', resolve))).toBe(4001);
+    const valid = new WebSocket(url(server), { headers: { Origin: `chrome-extension://${RELEASED_CHROME_EXTENSION_ID}` } });
+    await open(valid);
+    valid.send(JSON.stringify({ type: 'hello', role: 'browser', extensionId: RELEASED_CHROME_EXTENSION_ID, instanceId: 'released-store', label: 'Store' }));
+    await new Promise<void>(resolve => server!.onBrowserConnected(resolve));
+    expect(server.router.connectedBrowserIds()).toContain('released-store');
+    valid.close();
+  });
+  it('accepts a configured store ID only when its Origin matches its hello ID', async () => {
+    const storeId = 'a'.repeat(32);
+    server = await startServer({ ...config, extensionIds: [storeId] });
+    const ws = new WebSocket(url(server), { headers: { Origin: `chrome-extension://${storeId}` } });
+    await open(ws);
+    ws.send(JSON.stringify({ type: 'hello', role: 'browser', extensionId: 'pinnedextid', instanceId: 'bad', label: 'Bad' }));
+    expect(await new Promise<number>(resolve => ws.once('close', resolve))).toBe(4001);
+    const valid = new WebSocket(url(server), { headers: { Origin: `chrome-extension://${storeId}` } });
+    await open(valid);
+    valid.send(JSON.stringify({ type: 'hello', role: 'browser', extensionId: storeId, instanceId: 'store', label: 'Store' }));
+    await new Promise<void>(resolve => server!.onBrowserConnected(resolve));
+    expect(server.router.connectedBrowserIds()).toContain('store');
+    valid.close();
+  });
   it('binds 127.0.0.1 and exposes the chosen ephemeral port', async () => {
     server = await startServer(config);
     expect(server.port).toBeGreaterThan(0);

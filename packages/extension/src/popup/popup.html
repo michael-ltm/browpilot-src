@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>claude-browser</title>
+    <title>Browpilot</title>
     <style>
       :root { color-scheme: light; }
       body {
@@ -11,7 +11,7 @@
       }
       header {
         display: flex; align-items: center; gap: 8px;
-        padding: 12px 14px; border-bottom: 1px solid #f0f0f2;
+        padding: 12px 14px; border-bottom: 1px solid #f0f0f2; background: #0b1629; color: #f0fdfa;
       }
       header img { width: 22px; height: 22px; border-radius: 5px; }
       header .name { font-weight: 600; font-size: 14px; }
@@ -32,7 +32,7 @@
         border: 1px solid #e5e7eb; border-radius: 7px; font: inherit;
       }
       #cb-idle { width: 72px; }
-      #cb-label:focus, #cb-idle:focus { outline: none; border-color: #c4b5fd; box-shadow: 0 0 0 3px #ede9fe; }
+      #cb-label:focus, #cb-idle:focus { outline: none; border-color: #14b8a6; box-shadow: 0 0 0 3px #ccfbf1; }
       .row { display: flex; align-items: center; gap: 8px; }
       .row label { color: #374151; }
       .hint { color: #9ca3af; font-size: 11px; margin-top: 5px; }
@@ -46,14 +46,14 @@
         display: flex; gap: 14px; padding: 10px 14px;
         border-top: 1px solid #f0f0f2; font-size: 12px;
       }
-      footer a { color: #6d28d9; text-decoration: none; }
+      footer a { color: #0f766e; text-decoration: none; }
       footer a:hover { text-decoration: underline; }
     </style>
   </head>
   <body>
     <header>
       <img src="icons/icon48.png" alt="" />
-      <span class="name">claude-browser</span>
+      <span class="name">Browpilot</span>
       <span class="ver" id="version"></span>
     </header>
 
@@ -77,15 +77,15 @@
     <section>
       <h2>How to use</h2>
       <ol>
-        <li><code>claude mcp add claude-browser -- npx -y @john523100/claude-browser</code></li>
-        <li>Open a Claude Code session</li>
-        <li>Ask it to control the browser</li>
+        <li>Install the Browpilot companion on your computer.</li>
+        <li>Connect Codex, Claude Code, or another MCP client using the full guide below.</li>
+        <li>Ask your AI client to discover and open this browser profile.</li>
       </ol>
     </section>
 
     <footer>
-      <a id="gh" href="https://github.com/michael-ltm/claude-browser" target="_blank" rel="noreferrer">★ GitHub</a>
-      <a id="guide" href="https://github.com/michael-ltm/claude-browser#readme" target="_blank" rel="noreferrer">📖 Full guide</a>
+      <a id="gh" href="https://github.com/michael-ltm/browpilot" target="_blank" rel="noreferrer">★ GitHub</a>
+      <a id="guide" href="https://github.com/michael-ltm/browpilot#readme" target="_blank" rel="noreferrer">📖 Full guide</a>
     </footer>
 
     <script type="module" src="popup.js"></script>

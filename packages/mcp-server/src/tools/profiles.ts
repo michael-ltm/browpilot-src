@@ -30,12 +30,17 @@ const browser_select_profile = defineTool({
   async handler({ browserId, label }, ctx): Promise<ToolResult> {
     const res = await ctx.client.request<ListProfilesResult>(Method.LIST_PROFILES, {});
     let resolved = browserId;
-    if (!resolved && label) resolved = res.profiles.find((p) => p.label === label)?.browserId;
-    const connected = resolved !== undefined && res.profiles.some((p) => p.browserId === resolved);
+    if (!resolved && label) {
+      const matches = res.profiles.filter(p => p.label === label && p.status === 'connected');
+      if (matches.length > 1) return { ...textResult('Multiple connected profiles have that label; pass an exact browserId.'), isError: true };
+      resolved = matches[0]?.browserId;
+    }
+    const connected = resolved !== undefined && res.profiles.some((p) => p.browserId === resolved && p.status === 'connected');
     if (!resolved || !connected) {
       return { ...textResult(`no connected profile matched ${browserId ?? label ?? '(nothing)'}`), isError: true };
     }
     ctx.selectedBrowserId = resolved;
+    ctx.refs.clear();
     return textResult(`selected profile ${resolved}`);
   },
 });

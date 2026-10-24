@@ -5,7 +5,7 @@ import { Method } from '@claude-browser/shared';
 
 function fakeClient(responses: Record<string, unknown>) {
   const calls: Array<[string, unknown]> = [];
-  return { calls, request: async (m: string, p?: unknown) => { calls.push([m, p]); return responses[m]; } };
+  return { calls, request: async <R>(m: string, p?: unknown): Promise<R> => { calls.push([m, p]); return responses[m] as R; } };
 }
 const byName = (n: string) => profileTools.find((t) => t.name === n)!;
 
@@ -29,6 +29,6 @@ describe('profile tools', () => {
     const client = fakeClient({ [Method.GET_PROFILE_STATUS]: { profiles: [] } });
     const ctx = createContext(client);
     await byName('browser_status').handler({}, ctx);
-    expect(client.calls[0][0]).toBe(Method.GET_PROFILE_STATUS);
+    expect(client.calls[0]![0]).toBe(Method.GET_PROFILE_STATUS);
   });
 });

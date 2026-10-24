@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT, type Config } from '@claude-browser/shared';
+import { withReleaseDefaults } from './release-config.js';
 
 /** Absolute path to the broker config file. `home` is injectable for tests. */
 export function configPath(home: string = homedir()): string {
@@ -32,10 +33,10 @@ function isConfig(value: unknown): value is Config {
 export function ensureConfig(extensionId: string, home: string = homedir()): Config {
   const path = configPath(home);
   if (existsSync(path)) {
-    return loadRaw(path);
+    return withReleaseDefaults(loadRaw(path));
   }
   mkdirSync(join(home, CONFIG_DIR), { recursive: true });
-  const cfg: Config = { port: DEFAULT_PORT, token: generateToken(), extensionId };
+  const cfg: Config = withReleaseDefaults({ port: DEFAULT_PORT, token: generateToken(), extensionId });
   writeFileSync(path, JSON.stringify(cfg, null, 2), { encoding: 'utf8', mode: 0o600 });
   return cfg;
 }
@@ -57,7 +58,7 @@ export function loadConfig(home: string = homedir()): Config {
   if (!existsSync(path)) {
     throw new Error(`Config not found at ${path}; run install first`);
   }
-  const cfg = loadRaw(path);
+  const cfg = withReleaseDefaults(loadRaw(path));
   const override = process.env.CLAUDE_BROKER_PORT;
   if (override !== undefined) {
     const port = Number(override);

@@ -86,6 +86,7 @@ export function ensureConfig(extensionDir: string | null, home: string = homedir
   }
 
   const cfg: Config = {
+    ...existing,
     port: hasPort ? (existing!.port as number) : DEFAULT_PORT,
     token: hasToken ? (existing!.token as string) : randomBytes(32).toString('hex'),
     extensionId,

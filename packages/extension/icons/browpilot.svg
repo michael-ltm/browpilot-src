@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <title>Browpilot</title>
+  <rect width="128" height="128" rx="28" fill="#0b1629"/>
+  <path d="M31 30h66a8 8 0 0 1 8 8v53a8 8 0 0 1-8 8H31a8 8 0 0 1-8-8V38a8 8 0 0 1 8-8Z" fill="none" stroke="#d9f5f1" stroke-width="7"/>
+  <path d="M26 48h76" stroke="#d9f5f1" stroke-width="6"/>
+  <circle cx="35" cy="39" r="3" fill="#2dd4bf"/>
+  <circle cx="45" cy="39" r="3" fill="#2dd4bf"/>
+  <path d="m52 63 36-10-10 36-8-13-16 16-8-8 16-16Z" fill="#2dd4bf" stroke="#0b1629" stroke-width="4" stroke-linejoin="round"/>
+</svg>

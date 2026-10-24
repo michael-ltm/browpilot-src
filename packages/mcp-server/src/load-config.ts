@@ -26,6 +26,8 @@ export function parseConfig(raw: string): Config {
     port: typeof obj.port === 'number' ? obj.port : DEFAULT_PORT,
     token: obj.token,
     extensionId: obj.extensionId,
+    ...(Array.isArray(obj.extensionIds) ? { extensionIds: obj.extensionIds.filter((id): id is string => typeof id === 'string' && /^[a-p]{32}$/.test(id)) } : {}),
+    ...(obj.storeUrls ? { storeUrls: obj.storeUrls } : {}),
   };
 }
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "claude-browser",
-  "version": "0.1.6",
-  "description": "Codex-style stable browser control for Claude Code.",
+  "name": "Browpilot — Browser MCP for AI Agents",
+  "version": "0.2.1",
+  "description": "Connect your browser to Codex, Claude Code and MCP clients. Control tabs, inspect pages and reconnect to selected profiles.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0ZXFe2mqaYhBAXjATg46ae9G8Un8I7XQXGP+PoCqnNPfWciKEXOVarkLd9AmGAYTLcMgpYrtwM5WcDZPZ/bBMqA6hmpIWN7+coJ2lNZL/7VOXpUQbBBTTgUY6LfzyhE+umdfVJ1b943GyV6wNzm/wI8+Q4yl4X+CqZviiM2E2ETHQH6DhwvYqfCKHiiak6wT7KqTTrwAH2emdRK3eRzuyVvh+XJsMbYbFgK4A72XNFBljB6jMTZj53lHEbattB5k9RGbcpN/WM1VIeh9qIQ4ZZgOx5WoGZkpUoL4Pkc7aCy2l1/1y+tXSiZbtWSoFXnisAdLfT+ZM3OMFjhnNUrt9wIDAQAB",
   "minimum_chrome_version": "116",
   "background": {
@@ -11,7 +11,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "claude-browser",
+    "default_title": "Browpilot",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -23,12 +23,15 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["debugger", "tabs", "history", "alarms", "scripting", "storage", "identity", "identity.email"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["debugger", "tabs", "history", "alarms", "storage", "identity", "identity.email"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' ws://127.0.0.1:*;"
   },
   "web_accessible_resources": [
+    {
+      "matches": ["<all_urls>"],
+      "resources": ["pair.html"]
+    },
     {
       "matches": ["<all_urls>"],
       "resources": ["cursor.js"]

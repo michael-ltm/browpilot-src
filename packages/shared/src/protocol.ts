@@ -19,6 +19,8 @@ export const Method = {
   CLOSE_TAB: 'closeTab', GET_HISTORY: 'getHistory', ATTACH: 'attach', DETACH: 'detach',
   GET_CONSOLE: 'getConsole', SUBSCRIBE_EVENTS: 'subscribeEvents', GET_EVENTS: 'getEvents', PING: 'ping',
   LIST_PROFILES: 'listProfiles', GET_PROFILE_STATUS: 'getProfileStatus', GET_PROFILE_LOGS: 'getProfileLogs',
+  LIST_LOCAL_INSTANCES: 'listLocalInstances', REGISTER_LOCAL_INSTANCE: 'registerLocalInstance',
+  ENSURE_LOCAL_INSTANCE: 'ensureLocalInstance', INSTALL_LOCAL_EXTENSION: 'installLocalExtension', PAIR_LOCAL_PROFILE: 'pairLocalProfile',
 } as const;
 
 // Notifications: extension -> agent (routed/buffered by broker)
@@ -77,7 +79,11 @@ export interface GetProfileLogsResult { events: ProfileEvent[]; }
 export interface AmbiguousProfileData { profiles: ProfileInfo[]; }
 export interface OnProfileChangeParams extends ProfileInfo {}
 
-export interface Config { port: number; token: string; extensionId: string; }
+export interface Config {
+  port: number; token: string; extensionId: string;
+  extensionIds?: string[];
+  storeUrls?: Partial<Record<'chrome' | 'edge' | 'chromium', string>>;
+}
 export const DEFAULT_PORT = 8787;
 export const CONFIG_DIR = '.claude-browser';   // under os.homedir()
 export const CONFIG_FILE = 'config.json';

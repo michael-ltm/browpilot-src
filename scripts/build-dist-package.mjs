@@ -57,5 +57,6 @@ writeFileSync(
   JSON.stringify(makePackageManifest(root.version, publishDeps), null, 2) + '\n',
 );
 // 6. README for the npm page.
-writeFileSync(`${OUT}/README.md`, '# @john523100/claude-browser\n\nInstall: `claude mcp add claude-browser -- npx -y @john523100/claude-browser`\n\nThen load the unpacked extension printed by `npx -y @john523100/claude-browser extension-path`. See https://github.com/michael-ltm/claude-browser\n');
-console.log(`Assembled ${OUT}/ (claude-browser@${root.version})`);
+cpSync('docs/release-README.md', `${OUT}/README.md`);
+cpSync('LICENSE', `${OUT}/LICENSE`);
+console.log(`Assembled ${OUT}/ (Browpilot ${root.version}; legacy npm package retained)`);

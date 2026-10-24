@@ -8,6 +8,12 @@ import {
 } from '@claude-browser/shared';
 import { Router } from './router.js';
 import { ProfileRegistry } from './profiles.js';
+import { CONFIG_DIR, Method } from '@claude-browser/shared';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { LocalBrowserManager } from './local/index.js';
+import { routeWithLifecycle } from './lifecycle-rpc.js';
+import { withReleaseDefaults } from './release-config.js';
 
 const HOST = '127.0.0.1';
 const DEFAULT_HEARTBEAT_MS = 30_000;
@@ -16,6 +22,7 @@ export interface ServerDeps {
   router?: Router;
   registry?: ProfileRegistry;
   heartbeatMs?: number;
+  localManager?: LocalBrowserManager;
 }
 
 export interface BrokerServer {
@@ -39,23 +46,26 @@ interface LiveSocket extends WebSocket {
   browserId?: string;
 }
 
-function originAllowed(req: IncomingMessage, extensionId: string): boolean {
+function originAllowed(req: IncomingMessage, extensionIds: string[]): boolean {
   const origin = req.headers.origin;
   // The node ws client (agent) sends no Origin; only browser pages carry one.
   if (origin === undefined) return true;
-  return origin === `chrome-extension://${extensionId}`;
+  return extensionIds.some(id => origin === `chrome-extension://${id}`);
 }
 
 export function startServer(config: Config, deps: ServerDeps = {}): Promise<BrokerServer> {
+  config = withReleaseDefaults(config);
   const registry = deps.registry ?? new ProfileRegistry();
   const router = deps.router ?? new Router(registry);
+  const extensionIds = [...new Set([config.extensionId, ...(config.extensionIds ?? [])])];
+  const local = deps.localManager ?? new LocalBrowserManager({ configDir: join(homedir(), CONFIG_DIR), extensionIds, storeUrls: config.storeUrls, connectedIds: () => router.connectedBrowserIds() });
   const heartbeatMs = deps.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
 
   const wss = new WebSocketServer({
     host: HOST,
     port: config.port,
     verifyClient: ({ req }, done) => {
-      if (originAllowed(req, config.extensionId)) {
+      if (originAllowed(req, extensionIds)) {
         done(true);
       } else {
         done(false, 401, 'Unauthorized');
@@ -73,7 +83,7 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
       ws.isAlive = true;
     });
 
-    const browserOrigin = req.headers.origin === `chrome-extension://${config.extensionId}`;
+    const browserOrigin = req.headers.origin;
 
     ws.once('message', (data: RawData) => {
       let hello: Hello;
@@ -90,7 +100,7 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
       }
 
       if (hello.role === 'browser') {
-        if (!browserOrigin || hello.extensionId !== config.extensionId || typeof hello.instanceId !== 'string') {
+        if (!extensionIds.includes(hello.extensionId) || browserOrigin !== `chrome-extension://${hello.extensionId}` || typeof hello.instanceId !== 'string' || !hello.instanceId || typeof hello.label !== 'string') {
           ws.close(4001, 'UNAUTHORIZED');
           return;
         }
@@ -102,7 +112,7 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
         if (prev && prev !== ws) prev.terminate();
         browsers.set(browserId, ws);
         registry.connected(browserId, hello.label);
-        attachBrowser(ws, browserId, router, () => {
+        attachBrowser(ws, browserId, router, local, () => {
           if (browsers.get(browserId) === ws) {
             browsers.delete(browserId);
             return true;
@@ -121,7 +131,7 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
         }
         ws.role = 'agent';
         ws.sessionId = hello.sessionId;
-        attachAgent(ws, hello.sessionId, router);
+        attachAgent(ws, hello.sessionId, router, local);
         return;
       }
 
@@ -176,13 +186,20 @@ export function startServer(config: Config, deps: ServerDeps = {}): Promise<Brok
   });
 }
 
-function attachBrowser(ws: LiveSocket, browserId: string, router: Router, onClose: () => boolean): void {
+function attachBrowser(ws: LiveSocket, browserId: string, router: Router, local: LocalBrowserManager, onClose: () => boolean): void {
   router.registerBrowser(browserId, (msg: JsonRpcMessage) => ws.send(JSON.stringify(msg)));
   ws.on('message', (data: RawData) => {
     let msg: JsonRpcMessage;
     try {
       msg = JSON.parse(data.toString()) as JsonRpcMessage;
     } catch {
+      return;
+    }
+    if ('method' in msg && msg.method === Method.PAIR_LOCAL_PROFILE && 'id' in msg) {
+      const nonce = (msg.params as { nonce?: unknown } | undefined)?.nonce;
+      void (typeof nonce === 'string' ? local.pair(nonce, browserId) : Promise.resolve(false))
+        .then(ok => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { paired: ok } })); })
+        .catch(() => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { code: 1000, message: 'Could not persist profile pairing' } })); });
       return;
     }
     router.handleBrowserMessage(browserId, msg);
@@ -195,7 +212,7 @@ function attachBrowser(ws: LiveSocket, browserId: string, router: Router, onClos
   });
 }
 
-function attachAgent(ws: LiveSocket, sessionId: string, router: Router): void {
+function attachAgent(ws: LiveSocket, sessionId: string, router: Router, local: LocalBrowserManager): void {
   router.registerAgent(sessionId, (msg: JsonRpcMessage) => ws.send(JSON.stringify(msg)));
   ws.on('message', (data: RawData) => {
     let msg: JsonRpcMessage;
@@ -205,8 +222,8 @@ function attachAgent(ws: LiveSocket, sessionId: string, router: Router): void {
       return;
     }
     if ('method' in msg && 'id' in msg) {
-      void router.routeRequest(sessionId, msg as JsonRpcRequest).then((resp) => {
-        ws.send(JSON.stringify(resp));
+      void routeWithLifecycle(router, local, sessionId, msg as JsonRpcRequest).then((resp) => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(resp));
       });
     }
   });

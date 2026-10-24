@@ -1,4 +1,5 @@
 import { Method, type AttachParams } from '@claude-browser/shared';
+import type { DeveloperBrowser } from './developer/index.js';
 
 /** The subset of BrokerClient that tools depend on (so tests can fake it). */
 export interface RpcLike {
@@ -14,6 +15,7 @@ export interface ToolContext {
   attach(tabId: number, browserId?: string): Promise<void>;
   /** Remembered profile for this session; set by browser_select_profile. */
   selectedBrowserId: string | null;
+  developer?: DeveloperBrowser;
 }
 
 export function createContext(client: RpcLike): ToolContext {

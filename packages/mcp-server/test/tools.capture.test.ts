@@ -6,14 +6,14 @@ import { sourcesTools } from '../src/tools/sources.js';
 import { debuggerTools } from '../src/tools/debugger.js';
 import { createContext, type ToolContext } from '../src/context.js';
 import { FakeClient } from './helpers/fake-client.js';
-import type { ToolDef } from '../src/tools/types.js';
+import type { ToolDef, ToolResult } from '../src/tools/types.js';
 
 function pick(list: ToolDef[], name: string): ToolDef {
   const t = list.find((d) => d.name === name);
   if (!t) throw new Error(`no tool ${name}`);
   return t;
 }
-const textOf = (r: { content: Array<{ text?: string }> }) => (r.content[0] as { text: string }).text;
+const textOf = (r: ToolResult) => r.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
 const innerMethod = (c: { params: unknown }) => (c.params as { method?: string })?.method;
 
 describe('capture / power tools', () => {

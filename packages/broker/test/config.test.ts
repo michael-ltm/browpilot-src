@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CONFIG_DIR, CONFIG_FILE, DEFAULT_PORT } from '@claude-browser/shared';
 import { loadConfig, ensureConfig, configPath } from '../src/config.js';
+import { RELEASED_CHROME_EXTENSION_ID, RELEASED_CHROME_STORE_URL } from '../src/release-config.js';
 
 let home: string;
 
@@ -41,6 +42,23 @@ describe('ensureConfig', () => {
 });
 
 describe('loadConfig', () => {
+  it('adds the released Chrome extension and store listing to an existing companion config', () => {
+    ensureConfig('unpacked-id', home);
+    const cfg = loadConfig(home);
+    expect([cfg.extensionId, ...(cfg.extensionIds ?? [])]).toContain('unpacked-id');
+    expect(cfg.extensionIds).toContain(RELEASED_CHROME_EXTENSION_ID);
+    expect(cfg.storeUrls?.chrome).toBe(RELEASED_CHROME_STORE_URL);
+  });
+  it('preserves configured extra IDs and an explicit Chrome listing URL', () => {
+    ensureConfig('unpacked-id', home);
+    const stored = JSON.parse(readFileSync(configPath(home), 'utf8'));
+    stored.extensionIds = ['custom-id'];
+    stored.storeUrls = { chrome: 'https://example.com/custom-listing', edge: 'https://example.com/edge' };
+    writeFileSync(configPath(home), JSON.stringify(stored));
+    const cfg = loadConfig(home);
+    expect(cfg.extensionIds).toEqual(expect.arrayContaining(['custom-id', RELEASED_CHROME_EXTENSION_ID]));
+    expect(cfg.storeUrls).toMatchObject(stored.storeUrls);
+  });
   it('throws when the config file is absent', () => {
     expect(() => loadConfig(home)).toThrow(/not found/i);
   });
