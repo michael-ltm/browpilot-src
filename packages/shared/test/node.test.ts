@@ -14,12 +14,26 @@ describe('migrateLegacyConfigDir', () => {
     expect(existsSync(join(home, '.claude-browser'))).toBe(false);
   });
 
-  it('leaves both dirs alone when ~/.browpilot already exists', () => {
+  it('merges legacy entries into an existing ~/.browpilot without overwriting', () => {
+    const home = mkdtempSync(join(tmpdir(), 'bp-home-'));
+    mkdirSync(join(home, '.claude-browser', 'developer-profiles'), { recursive: true });
+    writeFileSync(join(home, '.claude-browser', 'config.json'), '{"token":"old"}');
+    writeFileSync(join(home, '.claude-browser', 'browser-profiles.json'), '{"legacy":true}');
+    mkdirSync(join(home, '.browpilot', 'developer-profiles'), { recursive: true });
+    writeFileSync(join(home, '.browpilot', 'browser-profiles.json'), '{"new":true}');
+    expect(migrateLegacyConfigDir(home)).toBe(true);
+    expect(readFileSync(join(home, '.browpilot', 'config.json'), 'utf8')).toBe('{"token":"old"}');
+    expect(readFileSync(join(home, '.browpilot', 'browser-profiles.json'), 'utf8')).toBe('{"new":true}');
+    expect(existsSync(join(home, '.claude-browser', 'browser-profiles.json'))).toBe(true);
+  });
+
+  it('removes the legacy dir once everything has moved', () => {
     const home = mkdtempSync(join(tmpdir(), 'bp-home-'));
     mkdirSync(join(home, '.claude-browser'));
+    writeFileSync(join(home, '.claude-browser', 'config.json'), '{}');
     mkdirSync(join(home, '.browpilot'));
-    expect(migrateLegacyConfigDir(home)).toBe(false);
-    expect(existsSync(join(home, '.claude-browser'))).toBe(true);
+    expect(migrateLegacyConfigDir(home)).toBe(true);
+    expect(existsSync(join(home, '.claude-browser'))).toBe(false);
   });
 
   it('is a no-op on a fresh machine', () => {

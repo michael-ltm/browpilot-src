@@ -28,6 +28,12 @@ async function canonical(path: string): Promise<string> {
   }
 }
 
+async function generatedProfile(): Promise<string> {
+  const base = join(homedir(), CONFIG_DIR, 'developer-profiles');
+  await mkdir(base, { recursive: true });
+  return mkdtemp(join(base, 'profile-'));
+}
+
 function dailyRoots(): string[] {
   const home = homedir();
   if (platform() === 'darwin') return ['Google/Chrome', 'Google/Chrome Beta', 'Google/Chrome Canary', 'Microsoft Edge', 'Microsoft Edge Beta', 'Chromium'].map(name => join(home, 'Library', 'Application Support', name));
@@ -77,10 +83,10 @@ export class DeveloperBrowser {
     const deadline = Date.now() + STARTUP_TIMEOUT_MS;
     try {
       if (!options.executable || !isAbsolute(options.executable)) throw new Error('Absolute browser executable required');
-      const base = join(homedir(), CONFIG_DIR, 'developer-profiles');
-      await mkdir(base, { recursive: true }); this.current(attempt);
       // Generated profiles are intentionally retained for subsequent debugging sessions.
-      const userDataDir = options.userDataDir ? resolve(options.userDataDir) : await mkdtemp(join(base, 'profile-'));
+      // The base dir is only created when a profile is generated, so an explicit userDataDir leaves home untouched.
+      const userDataDir = options.userDataDir ? resolve(options.userDataDir) : await generatedProfile();
+      this.current(attempt);
       await this.validateProfile(userDataDir); this.current(attempt);
       try { await lstat(join(userDataDir, 'SingletonLock')); throw new Error('Developer profile is locked'); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
