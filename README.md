@@ -6,7 +6,7 @@
 
 Browpilot combines a browser extension, a local broker and an MCP server. It discovers local browser profiles, reports extension installation separately from connection, opens a selected profile, and waits for verified extension pairing before sending commands. Existing screenshot, DOM, navigation, network and JavaScript debugger tools remain available.
 
-Previously named `claude-browser`. Starting with 0.2.2 every name is Browpilot: npm package `@john523100/browpilot`, command `browpilot`, MCP server name `browpilot` and configuration directory `~/.browpilot`. On first start the companion moves an existing `~/.claude-browser` directory to `~/.browpilot`, and the extension carries its stored settings over to the new storage keys; the development extension ID is unchanged. **Version 0.2.1 is available from the [GitHub release](https://github.com/michael-ltm/browpilot/releases/tag/v0.2.1); it has not been published to the npm registry. Chrome Web Store submission is pending review with automatic publication after approval.**
+Previously named `claude-browser`. Starting with 0.2.2 every name is Browpilot: npm package `@john523100/browpilot`, command `browpilot`, MCP server name `browpilot` and configuration directory `~/.browpilot`. On first start the companion moves an existing `~/.claude-browser` directory to `~/.browpilot`, and the extension carries its stored settings over to the new storage keys; the development extension ID is unchanged. **Version 0.2.2 is available from the [GitHub release](https://github.com/michael-ltm/browpilot/releases/tag/v0.2.2); it has not been published to the npm registry. Version 0.2.1 is published on the [Chrome Web Store](https://chromewebstore.google.com/detail/kglhakgapoegbnnbobnmnebmbljehcid); 0.2.2 is pending review with automatic publication after approval.**
 
 ## Build and connect
 
@@ -86,7 +86,7 @@ Outputs `artifacts/browpilot-chrome-0.2.2.zip` and `artifacts/browpilot-edge-0.2
 
 The assigned Chrome store ID `kglhakgapoegbnnbobnmnebmbljehcid` and its listing URL are built into the companion defaults. Add any additional actual store IDs to `extensionIds` in `~/.browpilot/config.json`, alongside the existing `extensionId`. Set `storeUrls.edge` after Microsoft assigns the real listing URL; `storeUrls.chrome` can override its default. Restart the companion broker after configuration changes. The allowlist requires browser Origin and hello ID to match exactly; never substitute guessed IDs.
 
-See [submission record](docs/store-submission-0.2.1.md), [store materials](docs/store-listing.md) and [privacy policy](docs/privacy.md). Publication requires publisher accounts, actual listing IDs, a hosted privacy-policy URL and store review. ZIP generation does not imply acceptance.
+See [submission record](docs/store-submission-0.2.2.md), [store materials](docs/store-listing.md) and [privacy policy](docs/privacy.md). Publication requires publisher accounts, actual listing IDs, a hosted privacy-policy URL and store review. ZIP generation does not imply acceptance.
 
 ## Verification
 
