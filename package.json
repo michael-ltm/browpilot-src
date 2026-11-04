@@ -11,7 +11,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w @browpilot/shared && npm run build --workspaces --if-present",
     "build:package": "node --import tsx scripts/build-dist-package.mjs",
     "build:store": "node --import tsx scripts/build-store.mjs",
     "test": "vitest run",

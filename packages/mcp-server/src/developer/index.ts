@@ -1,11 +1,28 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { homedir, platform } from 'node:os';
+import { homedir, hostname, platform } from 'node:os';
 import { join, resolve, basename, dirname, isAbsolute, sep } from 'node:path';
-import { mkdir, mkdtemp, readFile, lstat, realpath, unlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readlink, realpath, unlink } from 'node:fs/promises';
 import WebSocket from 'ws';
 import { CONFIG_DIR } from '@browpilot/shared';
+import { graphicalEnv } from '@browpilot/shared/node';
 
 export interface DeveloperTarget { targetId: string; type: string; title: string; url: string; [key: string]: unknown }
+export interface ExtensionTargets { extensionId: string; targets: DeveloperTarget[] }
+export interface LaunchOptions {
+  executable: string;
+  userDataDir?: string;
+  /** Unpacked extension to install once CDP is up (Extensions.loadUnpacked, persists in the profile). */
+  extensionPath?: string;
+  /** Extra browser flags. */
+  args?: string[];
+  /**
+   * The profile is open in a running browser: ask it to quit (SIGTERM, like the Quit menu, so the
+   * session is saved), then start it again with DevTools enabled and the previous session restored.
+   * On Linux the running browser's own flags are carried over. The relaunched browser is left
+   * running when this session closes.
+   */
+  takeOver?: boolean;
+}
 export interface DeveloperEvent { sequence: number; time: number; method: string; params?: Record<string, unknown>; sessionId?: string; targetId?: string }
 interface Pending { resolve: (value: unknown) => void; reject: (reason: Error) => void; timer: NodeJS.Timeout }
 interface Attempt { controller: AbortController; socket?: WebSocket; child?: ChildProcess; cancelled: boolean }
@@ -13,6 +30,37 @@ const MAX_EVENTS = 1000;
 const MAX_EVENT_BYTES = 64 * 1024;
 const COMMAND_TIMEOUT_MS = 10000;
 const STARTUP_TIMEOUT_MS = 15000;
+const QUIT_TIMEOUT_MS = 20000;
+// Flags that the relaunch sets itself; never carried over from the browser being replaced.
+const OWN_FLAGS = /^--(user-data-dir|remote-debugging-[a-z]+|enable-unsafe-extension-debugging|restore-last-session|no-startup-window)(=|$)/;
+
+const alive = (pid: number): boolean => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+/** Chromium's SingletonLock is a symlink to "<host>-<pid>"; return the pid when that process is alive. */
+async function lockOwner(userDataDir: string): Promise<number | null> {
+  let target: string;
+  try { target = await readlink(join(userDataDir, 'SingletonLock')); }
+  catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return null;
+    if (code === 'EINVAL') throw new Error('Developer profile is locked'); // not a symlink (Windows / unusual setup)
+    throw error;
+  }
+  const m = /^(.*)-(\d+)$/.exec(target);
+  // A lock from another machine (shared profile directory) or in an unknown format is never ours to break.
+  if (!m || m[1] !== hostname()) throw new Error('Developer profile is locked');
+  const pid = Number(m[2]);
+  return alive(pid) ? pid : null;
+}
+
+/** The running browser's own flags (Linux /proc only), minus the ones the relaunch controls. */
+async function carriedFlags(pid: number): Promise<string[]> {
+  if (platform() !== 'linux') return [];
+  try {
+    const argv = (await readFile(`/proc/${pid}/cmdline`, 'utf8')).split('\0').filter(Boolean).slice(1);
+    return argv.filter(arg => /^--[a-z]/i.test(arg) && !OWN_FLAGS.test(arg));
+  } catch { return []; }
+}
 
 async function canonical(path: string): Promise<string> {
   let current = resolve(path);
@@ -77,10 +125,10 @@ export class DeveloperBrowser {
   }
   private current(attempt: Attempt): void { if (this.attempt !== attempt || attempt.cancelled) throw new Error('Developer browser connection cancelled'); }
 
-  async launch(options: { executable: string; userDataDir?: string; extensionPath?: string }): Promise<{ port: number; userDataDir: string }> {
+  async launch(options: LaunchOptions): Promise<{ port: number; userDataDir: string; tookOver?: number; extensionId?: string }> {
     if (this.child && this.child.exitCode === null && this.child.pid) throw new Error('Owned browser is still running; close it before launching another');
     const attempt = this.begin();
-    const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+    let deadline = Date.now() + STARTUP_TIMEOUT_MS;
     try {
       if (!options.executable || !isAbsolute(options.executable)) throw new Error('Absolute browser executable required');
       // Generated profiles are intentionally retained for subsequent debugging sessions.
@@ -88,17 +136,37 @@ export class DeveloperBrowser {
       const userDataDir = options.userDataDir ? resolve(options.userDataDir) : await generatedProfile();
       this.current(attempt);
       await this.validateProfile(userDataDir); this.current(attempt);
-      try { await lstat(join(userDataDir, 'SingletonLock')); throw new Error('Developer profile is locked'); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+      const owner = await lockOwner(userDataDir); this.current(attempt);
+      let carried: string[] = [];
+      if (owner !== null) {
+        if (!options.takeOver) throw new Error(`Developer profile is open in a running browser (pid ${owner}); pass takeOver: true to restart it with DevTools enabled`);
+        carried = await carriedFlags(owner);
+        process.kill(owner, 'SIGTERM');
+        const quitBy = Date.now() + QUIT_TIMEOUT_MS;
+        while (alive(owner) && Date.now() < quitBy) await this.delay(attempt, 200);
+        if (alive(owner)) throw new Error(`Browser pid ${owner} did not quit within ${QUIT_TIMEOUT_MS / 1000}s; nothing was restarted`);
+        deadline = Date.now() + STARTUP_TIMEOUT_MS;
+      }
+      // owner === null with a lock present means this host's browser crashed and left it; Chromium replaces it.
       await mkdir(userDataDir, { recursive: true }); this.current(attempt);
       // A reused profile may contain a port file from another browser. Only a fresh file can identify this launch.
       try { await unlink(join(userDataDir, 'DevToolsActivePort')); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
       this.current(attempt);
-      const args = [`--user-data-dir=${userDataDir}`, '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', '--no-first-run'];
-      if (options.extensionPath) args.push(`--load-extension=${resolve(options.extensionPath)}`);
-      const child = spawn(options.executable, args, { stdio: 'ignore' });
-      attempt.child = child; this.child = child;
+      // --enable-unsafe-extension-debugging lets CDP install unpacked extensions (Extensions.loadUnpacked)
+      // and is what makes the extension tools below work on stock Chrome, which ignores --load-extension.
+      const args = [
+        ...carried,
+        ...(options.args ?? []),
+        `--user-data-dir=${userDataDir}`, '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0',
+        '--enable-unsafe-extension-debugging', '--no-first-run',
+        ...(owner !== null ? ['--restore-last-session'] : []),
+      ];
+      // A taken-over daily browser must outlive this MCP session, so it is detached and not owned.
+      const child = spawn(options.executable, args, { stdio: 'ignore', env: graphicalEnv(process.env), detached: owner !== null });
+      if (owner !== null) child.unref();
+      attempt.child = child;
+      if (owner === null) this.child = child;
       let failed: Error | undefined;
       child.once('error', error => { failed = error; });
       child.once('exit', (code, signal) => { failed = new Error(`Browser exited before CDP startup (${code ?? signal})`); });
@@ -110,7 +178,9 @@ export class DeveloperBrowser {
           const port = Number(lines[0]);
           if (Number.isInteger(port) && port > 0 && port <= 65535 && /^\/devtools\/browser\/[^/]+$/.test(lines[1] ?? '')) {
             await this.connectAttempt(attempt, port, lines[1], deadline);
-            return { port, userDataDir };
+            attempt.child = undefined; // connected: a later failure must not kill the browser
+            const extensionId = options.extensionPath ? await this.loadExtension(options.extensionPath) : undefined;
+            return { port, userDataDir, ...(owner !== null ? { tookOver: owner } : {}), ...(extensionId ? { extensionId } : {}) };
           }
         } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
         await this.delay(attempt, Math.min(50, deadline - Date.now()));
@@ -247,6 +317,63 @@ export class DeveloperBrowser {
     if (!result.sessionId) throw new Error('CDP did not return a session ID');
     this.sessionTargets.set(result.sessionId, targetId);
     return { sessionId: result.sessionId };
+  }
+
+  /** Every chrome-extension:// target (service workers, background pages, open extension pages), grouped by extension. */
+  async extensions(): Promise<ExtensionTargets[]> {
+    const groups = new Map<string, DeveloperTarget[]>();
+    for (const target of await this.targets()) {
+      const id = /^chrome-extension:\/\/([a-p]{32})\//.exec(target.url)?.[1];
+      if (id) groups.set(id, [...(groups.get(id) ?? []), target]);
+    }
+    return [...groups].map(([extensionId, targets]) => ({ extensionId, targets }));
+  }
+
+  /** Install an unpacked extension (needs the browser started by launch, which adds --enable-unsafe-extension-debugging). */
+  async loadExtension(path: string): Promise<string> {
+    if (!path || !isAbsolute(path)) throw new Error('Absolute extension path required');
+    const result = await this.command({ method: 'Extensions.loadUnpacked', params: { path: resolve(path) } }) as { id?: string };
+    if (!result?.id) throw new Error('Extensions.loadUnpacked returned no extension id');
+    return result.id;
+  }
+
+  /**
+   * Evaluate in an extension's own context, with its chrome.* APIs (storage, runtime, tabs, ...).
+   * Uses its service worker or background page when running; otherwise opens the extension's
+   * manifest.json in a background tab, which runs in the extension origin with the same APIs, and
+   * closes it afterwards. An expression there can wake the worker with chrome.runtime.sendMessage.
+   */
+  async extensionEval(extensionId: string, expression: string, where: 'auto' | 'worker' | 'page' = 'auto'): Promise<{ value: unknown; target: string }> {
+    if (!/^[a-p]{32}$/.test(extensionId)) throw new Error('extensionId must be a 32-letter extension id');
+    if (!expression) throw new Error('expression required');
+    const mine = (await this.extensions()).find(e => e.extensionId === extensionId)?.targets ?? [];
+    let target = where === 'page' ? undefined : mine.find(t => t.type === 'service_worker' || t.type === 'background_page');
+    if (!target && where === 'worker') throw new Error('Extension has no running service worker; use where "auto" or "page"');
+    let opened: string | undefined;
+    if (!target) {
+      const created = await this.command({ method: 'Target.createTarget', params: { url: `chrome-extension://${extensionId}/manifest.json`, background: true } }) as { targetId: string };
+      opened = created.targetId;
+      target = { targetId: created.targetId, type: 'page', title: '', url: `chrome-extension://${extensionId}/manifest.json` };
+      this.targetTypes.set(created.targetId, 'page');
+    }
+    try {
+      const { sessionId } = await this.attach(target.targetId);
+      try {
+        const evaluate = (expr: string) => this.command({ method: 'Runtime.evaluate', sessionId, params: { expression: expr, awaitPromise: true, returnByValue: true, userGesture: true } }) as Promise<{ result?: { value?: unknown; description?: string }; exceptionDetails?: { text?: string; exception?: { description?: string } } }>;
+        if (target.type === 'page') {
+          // A freshly opened extension page gets its chrome.* bindings shortly after the document starts.
+          const deadline = Date.now() + 5000;
+          while (!(await evaluate("typeof chrome === 'object' && !!chrome.runtime && !!chrome.runtime.id")).result?.value && Date.now() < deadline) await new Promise(r => setTimeout(r, 100));
+        }
+        const result = await evaluate(expression);
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text ?? 'evaluation failed');
+        return { value: result.result?.value ?? result.result?.description ?? null, target: `${target.type} ${target.url}` };
+      } finally {
+        await this.command({ method: 'Target.detachFromTarget', params: { sessionId } }).catch(() => {});
+      }
+    } finally {
+      if (opened) await this.command({ method: 'Target.closeTarget', params: { targetId: opened } }).catch(() => {});
+    }
   }
 
   command(options: { method: string; params?: Record<string, unknown>; sessionId?: string }): Promise<unknown> {

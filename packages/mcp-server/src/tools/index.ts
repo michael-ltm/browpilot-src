@@ -17,6 +17,7 @@ import { instanceTools } from './instances.js';
 import { developerTools } from './developer.js';
 import { guardProfile, acceptProfileResult } from '../profile-guard.js';
 import { detectTools } from './detect.js';
+import { extensionTools } from './extensions.js';
 
 /** Every v1 browser_* tool, in a stable order. */
 export const allTools: ToolDef[] = [
@@ -33,6 +34,7 @@ export const allTools: ToolDef[] = [
   ...instanceTools,
   ...developerTools,
   ...detectTools,
+  ...extensionTools,
 ];
 
 /** Agent-facing guidance returned when multiple profiles are connected and none is selected. */

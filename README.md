@@ -55,25 +55,46 @@ Grok cloud services require a reachable HTTPS endpoint. Configure an authenticat
 
 For xAI API Remote MCP, supply the public `/mcp` URL as `server_url` with the API's supported authorization option. A local xAI tool-calling application can instead consume stdio MCP. See [xAI Remote MCP](https://docs.x.ai/developers/tools/remote-mcp) and [Grok custom MCP tunneling](https://docs.x.ai/grok/connectors/custom-mcp-tunneling).
 
-## Debug another browser extension
+## Operate and debug other browser extensions
 
-`browser_developer` owns a separate direct-CDP connection per MCP session:
+Chrome refuses `chrome.debugger` on other extensions' pages and workers, so the regular tools (`browser_eval`, snapshots, screenshots) stop at `chrome-extension://` URLs. Two tools cover extensions instead.
+
+### `browser_extensions` — through the paired Browpilot extension, no restart
 
 | action | Purpose |
 | --- | --- |
-| `launch` | Start an explicit executable with a dedicated profile; optionally load an unpacked extension on a browser supporting that flag |
+| `list` | Installed extensions: id, version, unpacked or store, options page |
+| `reload` | Re-read an unpacked extension from disk (the reload button); `id` = Browpilot reloads itself |
+| `enable` / `disable` | Toggle an extension |
+| `open_options` | Open its options page in a tab |
+| `message` | `chrome.runtime.sendMessage(id, message)` and return the reply; works with extensions that listen on `chrome.runtime.onMessageExternal` |
+
+`id` accepts an extension id or a unique part of its name. Needs the `management` permission (added in this version; reload Browpilot once on `chrome://extensions` after updating).
+
+### `browser_developer` — direct CDP, full access to every extension
+
+| action | Purpose |
+| --- | --- |
+| `launch` | Start a browser with DevTools and `--enable-unsafe-extension-debugging`. `userDataDir` picks the profile (generated when omitted). `takeOver: true` quits a browser that already has that profile open (SIGTERM, session saved), then restarts it with DevTools, `--restore-last-session` and, on Linux, its previous flags; the restarted browser stays running after `close`. `extensionPath` installs an unpacked extension |
 | `connect` | Attach to an already-enabled loopback CDP port |
+| `extensions` | Every extension's service worker / background page / open pages, grouped by extension id |
+| `extension_eval` | Evaluate `expression` inside extension `extensionId` with its own `chrome.*` APIs (storage, runtime, tabs…): in its worker when running, otherwise in its `manifest.json` page (opened in the background and closed afterwards; `chrome.runtime.sendMessage` from there wakes the worker). `where`: `auto` / `worker` / `page` |
+| `load_extension` | Install an unpacked extension from `extensionPath` (`Extensions.loadUnpacked`); it persists in the profile like "Load unpacked" |
 | `targets` | List pages, extension pages and workers |
 | `attach` | Attach a target and return its flat `sessionId` |
 | `contexts` | Enable Runtime and list observed execution contexts for a session |
 | `evaluate` | Evaluate in an explicit session and `contextId` |
-| `command` | Send CDP, including breakpoints, script source, Runtime and Network commands |
+| `command` | Send any CDP method: breakpoints, script source, Network, `Extensions.uninstall`, `Input.*`, `Page.captureScreenshot` |
 | `events` | Poll bounded events; pass the last sequence as `since` |
-| `close` | Disconnect and terminate only a browser launched by this developer session |
+| `close` | Disconnect; terminates only a browser this session launched fresh, never a taken-over one |
 
-Example: `launch` → `targets` → `attach` the extension's `service_worker` → `contexts` → `evaluate`. Use `command` with `Debugger.enable`, `Debugger.setBreakpointByUrl` and `Debugger.getScriptSource` for breakpoint/source inspection. Trigger the target extension to create its popup or worker when needed. Chrome for Testing/Chromium is recommended for `extensionPath`; stock Chrome can require manual loading.
+Examples:
 
-A webpage context differs from extension content-script contexts; a worker is another target. Direct CDP preserves target/session identity and avoids automatically applying page emulation to workers. Capabilities remain browser/version dependent. Default daily browser directories are refused for developer launches. Generated developer profiles are retained under `~/.browpilot/developer-profiles` for inspection. Ordinary daily profiles use `browser_open_instance` instead.
+- Change an extension's settings: `launch {userDataDir, takeOver: true}` → `extension_eval {extensionId, expression: "chrome.storage.local.set({...})"}`.
+- Work with an extension page's UI: `command Target.createTarget {url: "chrome-extension://<id>/options.html"}` → `attach` → `command Runtime.evaluate` / `Input.dispatchMouseEvent` / `Page.captureScreenshot` with that `sessionId`.
+- Breakpoints: `attach` the `service_worker` → `command Debugger.enable`, `Debugger.setBreakpointByUrl`, `Debugger.getScriptSource`.
+
+A webpage context differs from extension content-script contexts; a worker is another target. Direct CDP preserves target/session identity and avoids automatically applying page emulation to workers. Chrome refuses DevTools on its default user data directory, and developer launches refuse the daily browser directories too: use a separate `--user-data-dir` profile for extension work. Generated developer profiles are retained under `~/.browpilot/developer-profiles` for inspection. Ordinary daily profiles use `browser_open_instance` instead.
 
 ## Store preparation
 

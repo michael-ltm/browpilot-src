@@ -21,6 +21,7 @@ export const Method = {
   LIST_PROFILES: 'listProfiles', GET_PROFILE_STATUS: 'getProfileStatus', GET_PROFILE_LOGS: 'getProfileLogs',
   LIST_LOCAL_INSTANCES: 'listLocalInstances', REGISTER_LOCAL_INSTANCE: 'registerLocalInstance',
   ENSURE_LOCAL_INSTANCE: 'ensureLocalInstance', INSTALL_LOCAL_EXTENSION: 'installLocalExtension', PAIR_LOCAL_PROFILE: 'pairLocalProfile',
+  LIST_EXTENSIONS: 'listExtensions', MANAGE_EXTENSION: 'manageExtension', MESSAGE_EXTENSION: 'messageExtension',
 } as const;
 
 // Notifications: extension -> agent (routed/buffered by broker)
@@ -41,6 +42,21 @@ export interface CloseTabParams { tabId: number; browserId?: string; }
 export interface GetHistoryParams { query: string; limit?: number; browserId?: string; }
 export interface HistoryEntry { url: string; title?: string; lastVisitTime?: number; visitCount?: number; }
 export interface GetHistoryResult { entries: HistoryEntry[]; }
+// Other extensions installed in the profile (chrome.management). Chrome does not let
+// chrome.debugger attach to another extension's pages, so extensions are driven through
+// management actions and cross-extension messages instead.
+export interface ExtensionInfo {
+  id: string; name: string; version: string; enabled: boolean; installType: string; type: string;
+  optionsUrl?: string; description?: string; mayDisable: boolean; isSelf: boolean; disabledReason?: string;
+}
+export interface ListExtensionsParams { browserId?: string; }
+export interface ListExtensionsResult { extensions: ExtensionInfo[]; }
+export type ManageExtensionAction = 'reload' | 'enable' | 'disable' | 'open_options';
+export interface ManageExtensionParams { id: string; action: ManageExtensionAction; browserId?: string; }
+export interface ManageExtensionResult { extension?: ExtensionInfo; tabId?: number; detail?: string; }
+// chrome.runtime.sendMessage(id, message): the target answers from chrome.runtime.onMessageExternal.
+export interface MessageExtensionParams { id: string; message: unknown; timeoutMs?: number; browserId?: string; }
+export interface MessageExtensionResult { response: unknown; }
 export interface ConsoleEntry { tabId: number; level: string; text: string; timestamp: number; args?: unknown[]; url?: string; line?: number; }
 export interface GetConsoleParams { tabId?: number; filter?: string; since?: number; browserId?: string; }
 export interface GetConsoleResult { entries: ConsoleEntry[]; }

@@ -6,6 +6,8 @@ import {
   type SwitchTabParams,
   type CloseTabParams,
   type GetHistoryParams,
+  type ManageExtensionParams,
+  type MessageExtensionParams,
   Method,
 } from '@browpilot/shared';
 import {
@@ -17,6 +19,7 @@ import {
 } from './transport';
 import { handleExecuteCdp, attach, detach, registerCdpEventForwarding, registerAutoReattach, checkIdle } from './relay';
 import { getTabs, newTab, switchTab, closeTab, getHistory } from './helpers';
+import { listExtensions, manageExtension, messageExtension } from './extensions';
 import { migrateLegacyStorage, resolvePort, resolveExtensionId, getInstanceId, getLabel, resolveIdleDetachMin } from './config';
 import { registerPairing } from './pairing';
 
@@ -41,6 +44,9 @@ export function bootstrap(transport: Transport): void {
   transport.registerHandler(Method.SWITCH_TAB, (p) => switchTab(p as SwitchTabParams));
   transport.registerHandler(Method.CLOSE_TAB, (p) => closeTab(p as CloseTabParams));
   transport.registerHandler(Method.GET_HISTORY, (p) => getHistory(p as GetHistoryParams));
+  transport.registerHandler(Method.LIST_EXTENSIONS, () => listExtensions());
+  transport.registerHandler(Method.MANAGE_EXTENSION, (p) => manageExtension(p as ManageExtensionParams));
+  transport.registerHandler(Method.MESSAGE_EXTENSION, (p) => messageExtension(p as MessageExtensionParams));
   transport.registerHandler(Method.PING, () => ({ pong: true }));
 
   registerCdpEventForwarding(transport);

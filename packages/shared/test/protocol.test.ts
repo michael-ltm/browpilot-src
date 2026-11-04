@@ -20,6 +20,7 @@ describe('Method constant wire values', () => {
     expect(Method).toEqual({
       LIST_LOCAL_INSTANCES: 'listLocalInstances', REGISTER_LOCAL_INSTANCE: 'registerLocalInstance',
       ENSURE_LOCAL_INSTANCE: 'ensureLocalInstance', INSTALL_LOCAL_EXTENSION: 'installLocalExtension', PAIR_LOCAL_PROFILE: 'pairLocalProfile',
+      LIST_EXTENSIONS: 'listExtensions', MANAGE_EXTENSION: 'manageExtension', MESSAGE_EXTENSION: 'messageExtension',
       EXECUTE_CDP: 'executeCdp',
       GET_TABS: 'getTabs',
       NEW_TAB: 'newTab',

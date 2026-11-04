@@ -303,3 +303,76 @@ test('raw commands with unknown session identity reach CDP', async () => {
   browser = new DeveloperBrowser(); await browser.connect(port);
   expect(await browser.command({method:'Emulation.clearDeviceMetricsOverride',sessionId:'external-session'})).toEqual({});
 });
+
+test('launch refuses a profile open in a live browser unless takeOver, then quits it and relaunches with its flags', async () => {
+  const { mkdtemp, writeFile, chmod, rm, mkdir, symlink, readFile } = await import('node:fs/promises');
+  const { tmpdir, hostname } = await import('node:os');
+  const { join } = await import('node:path');
+  const { spawn } = await import('node:child_process');
+  const base = await mkdtemp(join(tmpdir(), 'developer-takeover-'));
+  const port = await fixture(() => {});
+  const executable = join(base, 'fake-browser'); const profile = join(base, 'profile');
+  // The "running browser": a node process whose argv carries a flag that must survive the relaunch.
+  const running = spawn(process.execPath, ['-e', 'process.on("SIGTERM",()=>process.exit(0));setInterval(()=>{},1000)', '--', '--ozone-platform=wayland', '--remote-debugging-port=9', `--user-data-dir=${profile}`], { stdio: 'ignore' });
+  try {
+    await mkdir(profile);
+    await new Promise(r => setTimeout(r, 200));
+    await symlink(`${hostname()}-${running.pid}`, join(profile, 'SingletonLock'));
+    await writeFile(executable, `#!/usr/bin/env node\nconst fs=require('fs'); const dir=process.argv.find(x=>x.startsWith('--user-data-dir=')).slice(16); fs.writeFileSync(dir+'/argv.json',JSON.stringify(process.argv.slice(2))); fs.writeFileSync(dir+'/DevToolsActivePort','${port}\\n/devtools/browser/test\\n'); setTimeout(()=>process.exit(0),3000);\n`);
+    await chmod(executable, 0o755);
+    browser = new DeveloperBrowser();
+    await expect(browser.launch({ executable, userDataDir: profile })).rejects.toThrow(/takeOver/);
+    browser = new DeveloperBrowser();
+    const res = await browser.launch({ executable, userDataDir: profile, takeOver: true });
+    expect(res).toMatchObject({ port, userDataDir: profile, tookOver: running.pid });
+    expect(running.exitCode ?? running.signalCode).not.toBeNull();
+    const argv = JSON.parse(await readFile(join(profile, 'argv.json'), 'utf8')) as string[];
+    // node's own -e script args are not flags; the wayland flag is carried, the old debugging port is replaced
+    expect(argv).toContain('--ozone-platform=wayland');
+    expect(argv).toContain('--enable-unsafe-extension-debugging');
+    expect(argv).toContain('--restore-last-session');
+    expect(argv.filter(a => a.startsWith('--remote-debugging-port'))).toEqual(['--remote-debugging-port=0']);
+  } finally { running.kill('SIGKILL'); await browser?.close(); await rm(base, { recursive: true, force: true }); }
+});
+
+test('extensions groups extension targets; extension_eval uses the worker, or opens manifest.json when it is asleep', async () => {
+  const A = 'a'.repeat(32), B = 'b'.repeat(32);
+  const created: string[] = []; const closed: string[] = []; const evals: Array<[string, string]> = [];
+  const port = await fixture((m, send) => {
+    const p = (m.params ?? {}) as Record<string, unknown>;
+    if (m.method === 'Target.getTargets') send({ id: m.id, result: { targetInfos: [
+      { targetId: 'sw-a', type: 'service_worker', title: '', url: `chrome-extension://${A}/background.js` },
+      { targetId: 'opt-a', type: 'page', title: 'Options', url: `chrome-extension://${A}/options.html` },
+      { targetId: 'web', type: 'page', title: 'x', url: 'https://example.com/' },
+    ] } });
+    else if (m.method === 'Target.createTarget') { created.push(String(p.url)); send({ id: m.id, result: { targetId: 'tmp-b' } }); }
+    else if (m.method === 'Target.attachToTarget') send({ id: m.id, result: { sessionId: `s-${p.targetId}` } });
+    else if (m.method === 'Runtime.evaluate') { evals.push([String(m.sessionId), String(p.expression)]); send({ id: m.id, result: { result: { value: { from: m.sessionId } } } }); }
+    else if (m.method === 'Target.closeTarget') { closed.push(String(p.targetId)); send({ id: m.id, result: { success: true } }); }
+    else if (m.method === 'Extensions.loadUnpacked') send({ id: m.id, result: { id: B } });
+    else send({ id: m.id, result: {} });
+  });
+  browser = new DeveloperBrowser(); await browser.connect(port);
+  const groups = await browser.extensions();
+  expect(groups.map(g => [g.extensionId, g.targets.map(t => t.targetId)])).toEqual([[A, ['sw-a', 'opt-a']]]);
+  expect(await browser.extensionEval(A, 'chrome.storage.local.get()')).toEqual({ value: { from: 's-sw-a' }, target: `service_worker chrome-extension://${A}/background.js` });
+  expect(await browser.extensionEval(B, '1')).toMatchObject({ value: { from: 's-tmp-b' } });
+  expect(created).toEqual([`chrome-extension://${B}/manifest.json`]);
+  expect(closed).toEqual(['tmp-b']);
+  await expect(browser.extensionEval(B, '1', 'worker')).rejects.toThrow(/no running service worker/);
+  await expect(browser.extensionEval('nope', '1')).rejects.toThrow(/32-letter/);
+  expect(await browser.loadExtension('/tmp/some-ext')).toBe(B);
+  await expect(browser.loadExtension('relative/ext')).rejects.toThrow(/Absolute/);
+});
+
+test('extension_eval surfaces exceptions from the extension', async () => {
+  const A = 'c'.repeat(32);
+  const port = await fixture((m, send) => {
+    if (m.method === 'Target.getTargets') send({ id: m.id, result: { targetInfos: [{ targetId: 'sw', type: 'service_worker', title: '', url: `chrome-extension://${A}/sw.js` }] } });
+    else if (m.method === 'Target.attachToTarget') send({ id: m.id, result: { sessionId: 's' } });
+    else if (m.method === 'Runtime.evaluate') send({ id: m.id, result: { result: {}, exceptionDetails: { text: 'Uncaught', exception: { description: 'TypeError: boom' } } } });
+    else send({ id: m.id, result: {} });
+  });
+  browser = new DeveloperBrowser(); await browser.connect(port);
+  await expect(browser.extensionEval(A, 'boom()')).rejects.toThrow(/TypeError: boom/);
+});
