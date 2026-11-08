@@ -1,4 +1,4 @@
-# Browpilot 0.2.2 review instructions
+# Browpilot 0.2.3 review instructions
 
 Browpilot connects a user-selected local Chrome profile to MCP tools. The extension requires a companion running on the same computer. No Browpilot account, paid subscription, or hosted Browpilot service is required. Any AI provider account belongs to the client; reviewers can call tools directly from a stdio MCP client without an AI account.
 
@@ -8,7 +8,7 @@ Browpilot connects a user-selected local Chrome profile to MCP tools. The extens
 2. Install the released companion:
 
    ```sh
-   npm install -g https://github.com/michael-ltm/browpilot/releases/download/v0.2.2/john523100-browpilot-0.2.2.tgz
+   npm install -g https://github.com/michael-ltm/browpilot/releases/download/v0.2.3/john523100-browpilot-0.2.3.tgz
    ```
 
 3. Configure a stdio MCP client to execute `browpilot` with no arguments. The MCP client starts the companion automatically. For supported AI clients, `browpilot install codex` or `browpilot install claude` registers it; restart that client afterwards. `browpilot config codex` and `browpilot config claude` print configuration if automatic registration is unavailable.

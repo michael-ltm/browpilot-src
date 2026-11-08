@@ -1,7 +1,7 @@
 {
   "name": "browpilot",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Browser MCP for AI agents: Codex, Claude Code and Grok",
   "type": "module",
   "engines": {

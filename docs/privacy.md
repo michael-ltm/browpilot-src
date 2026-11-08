@@ -1,6 +1,6 @@
 # Browpilot privacy policy
 
-Effective version: 0.2.2. Browpilot was previously named claude-browser.
+Effective version: 0.2.3. Browpilot was previously named claude-browser.
 
 Browpilot connects a browser extension to a local companion so an AI client selected by you can operate browser profiles and inspect pages. The companion and extension have no built-in hosted data collection service or analytics.
 
@@ -10,7 +10,7 @@ Depending on invoked tools, Browpilot processes tab titles and URLs, screenshots
 
 The websites and operations you choose determine the information processed. Requested page content, screenshots, form values and network records may include personal identifiers, health information, financial or payment information, authentication information, personal communications, location information, browsing history, interaction activity and other website content. These categories are handled as part of the requested browser task, not as separate analytics or profiling collections.
 
-The companion reads browser installation paths, profile directories and extension installation metadata. Discovery does not read cookies or login databases, and installation does not modify browser Preferences. Registered profiles and verified instance bindings are persisted locally.
+The companion reads browser installation paths, profile directories and extension installation metadata. When you invoke the extension-management tool, the extension lists installed extensions (name, ID, version, enabled state) and can reload, enable, disable or message one you name. Discovery does not read cookies or login databases, and installation does not modify browser Preferences. Registered profiles and verified instance bindings are persisted locally.
 
 ## Storage and transfers
 

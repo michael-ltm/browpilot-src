@@ -24,6 +24,7 @@ Browpilot is independent and is not affiliated with OpenAI, Anthropic, xAI, Goog
 | `alarms` | Wake the service worker and retry the local companion connection |
 | `storage` | Local identity, profile labels, settings and status |
 | `identity`, `identity.email` | Default profile label from the Google email local part, when available |
+| `management` | When the user asks for it: list installed extensions, reload, enable or disable one, open its options page; used for extension development and debugging. Never runs automatically |
 
 Justify each permission against the submitted build. If dropping a legacy capability, remove its permission and implementation together and re-test. Do not claim zero data transfer: requested results reach the user's AI client.
 
