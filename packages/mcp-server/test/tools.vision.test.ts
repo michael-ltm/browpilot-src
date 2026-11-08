@@ -58,10 +58,17 @@ describe('vision tools', () => {
     expect(cdp[0]!.params).toMatchObject({ type: 'mouseMoved', x: 7, y: 8 });
   });
 
-  it('browser_type sends Input.insertText', async () => {
+  it('browser_type types each character as real key events', async () => {
     await toolByName('browser_type').handler({ text: 'hi', tabId: 1 }, ctx);
+    const cdp = client.cdpCalls();
+    expect(cdp.map((c) => `${c.params?.type}:${c.params?.key}`)).toEqual(['keyDown:h', 'keyUp:h', 'keyDown:i', 'keyUp:i']);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(client.cdpCalls()[0]!).toMatchObject({ method: 'Input.insertText', params: { text: 'hi' } });
+    expect(cdp[0]!.params).toMatchObject({ text: 'h' });
+  });
+
+  it('browser_type sends Chinese through an IME composition', async () => {
+    await toolByName('browser_type').handler({ text: '中文', tabId: 1 }, ctx);
+    expect(client.cdpCalls().map((c) => c.method)).toEqual(['Input.imeSetComposition', 'Input.insertText']);
   });
 
   it('browser_press_key expands a chord into key events', async () => {
@@ -83,15 +90,24 @@ describe('vision tools', () => {
     });
   });
 
-  it('browser_drag sends press(from) -> move(to) -> release(to)', async () => {
-    await toolByName('browser_drag').handler({ fromX: 1, fromY: 2, toX: 30, toY: 40, tabId: 1 }, ctx);
+  it('browser_scroll points the wheel at the viewport center by default', async () => {
+    client.onCdp('Runtime.evaluate', { result: { value: [400, 300] } });
+    await toolByName('browser_scroll').handler({ deltaX: 0, deltaY: 120, tabId: 1 }, ctx);
+    const wheel = client.cdpCalls().find((c) => c.params?.type === 'mouseWheel');
+    expect(wheel?.params).toMatchObject({ x: 400, y: 300, deltaY: 120 });
+  });
+
+  it('browser_drag hovers, presses, moves in steps with the button held, and releases', async () => {
+    await toolByName('browser_drag').handler({ fromX: 0, fromY: 0, toX: 30, toY: 60, steps: 3, tabId: 1 }, ctx);
     const cdp = client.cdpCalls();
-    expect(cdp.map((c) => c.params?.type)).toEqual(['mousePressed', 'mouseMoved', 'mouseReleased']);
+    expect(cdp.map((c) => c.params?.type)).toEqual([
+      'mouseMoved', 'mousePressed', 'mouseMoved', 'mouseMoved', 'mouseMoved', 'mouseReleased',
+    ]);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(cdp[0]!.params).toMatchObject({ x: 1, y: 2, button: 'left', buttons: 1 });
+    expect(cdp[1]!.params).toMatchObject({ x: 0, y: 0, button: 'left', buttons: 1 });
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(cdp[1]!.params).toMatchObject({ x: 30, y: 40, buttons: 1 });
+    expect(cdp[2]!.params).toMatchObject({ x: 10, y: 20, buttons: 1 });
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(cdp[2]!.params).toMatchObject({ x: 30, y: 40, button: 'left', buttons: 0 });
+    expect(cdp[5]!.params).toMatchObject({ x: 30, y: 60, button: 'left', buttons: 0 });
   });
 });

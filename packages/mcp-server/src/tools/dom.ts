@@ -1,6 +1,14 @@
 import { z } from 'zod';
-import { ErrorCode } from '@browpilot/shared';
-import { clickEvents, insertTextCmd, boxCenter, keyEvents } from '../cdp.js';
+import {
+  clickEvents,
+  hoverEvent,
+  keyEvents,
+  typeEvents,
+  insertTextCmd,
+  modifierBits,
+  withModifiers,
+  type MouseButton,
+} from '../cdp.js';
 import { compactAxTree, type AxTree } from '../snapshot.js';
 import {
   defineTool,
@@ -10,28 +18,50 @@ import {
   type ToolDef,
   type ToolResult,
 } from './types.js';
+import {
+  ActionError,
+  RefError,
+  focusState,
+  inspect,
+  locate,
+  resolveObject,
+  resolveRef,
+  selectOption,
+  setNativeValue,
+} from './element.js';
 import type { ToolContext } from '../context.js';
 
 function errorResult(text: string): ToolResult {
   return { content: [{ type: 'text', text }], isError: true };
 }
 
-/** Resolve a snapshot ref to its backendDOMNodeId or throw a stale-ref error. */
-function resolveRef(ctx: ToolContext, ref: string): number {
-  const id = ctx.refs.get(ref);
-  if (id === undefined) {
-    throw new RefError(`stale or unknown ref "${ref}" — re-run browser_snapshot`);
+/** Run an element action, turning stale refs and actionability failures into tool errors. */
+async function withElement(
+  ctx: ToolContext,
+  ref: string,
+  tabId: number,
+  action: (objectId: string, backendNodeId: number) => Promise<ToolResult>,
+): Promise<ToolResult> {
+  try {
+    const backendNodeId = resolveRef(ctx, ref);
+    await ctx.attach(tabId);
+    const objectId = await resolveObject(ctx, tabId, backendNodeId);
+    return await action(objectId, backendNodeId);
+  } catch (e) {
+    if (e instanceof RefError || e instanceof ActionError) return errorResult(`${ref}: ${e.message}`);
+    throw e;
   }
-  return id;
 }
 
-class RefError extends Error {
-  code = ErrorCode.STALE_REF;
-}
+/** Above this length fill pastes (Input.insertText) instead of typing key by key. */
+const TYPE_LIMIT = 2000;
+
+const TRUE_WORDS = ['true', 'checked', 'on', 'yes', '1'];
+const FALSE_WORDS = ['false', 'unchecked', 'off', 'no', '0'];
 
 const browser_snapshot = defineTool({
   name: 'browser_snapshot',
-  description: 'Accessibility snapshot of the page as a compact list of elements with stable [refN] handles for browser_click_ref/browser_fill.',
+  description: 'Accessibility snapshot of the page as a compact list of elements with stable [refN] handles for browser_click_ref/browser_hover_ref/browser_fill.',
   inputSchema: { tabId: z.number().int() },
   async handler({ tabId }, ctx): Promise<ToolResult> {
     await ctx.attach(tabId);
@@ -48,57 +78,141 @@ const browser_snapshot = defineTool({
 
 const browser_click_ref = defineTool({
   name: 'browser_click_ref',
-  description: 'Click an element by its snapshot [refN] handle (resolved via DOM.getBoxModel center).',
-  inputSchema: { ref: z.string(), tabId: z.number().int() },
-  async handler({ ref, tabId }, ctx): Promise<ToolResult> {
-    let backendNodeId: number;
-    try {
-      backendNodeId = resolveRef(ctx, ref);
-    } catch (e) {
-      return errorResult((e as Error).message);
-    }
-    await ctx.attach(tabId);
-    const box = await execCdp<{ model: { content: number[] } }>(ctx, tabId, {
-      method: 'DOM.getBoxModel',
-      params: { backendNodeId },
+  description:
+    'Click an element by its snapshot [refN] handle with real mouse input, like a user: scrolls it into view, waits for it to stop moving, ' +
+    'checks nothing covers it, then moves the pointer there and presses/releases (hover, pointerdown, mousedown, focus, mouseup, click). ' +
+    'Errors if an overlay covers it (force:true clicks anyway). count:2 double-clicks; modifiers e.g. ["Control"] holds keys during the click. ' +
+    'A ref to a native <option> selects it.',
+  inputSchema: {
+    ref: z.string(),
+    button: z.enum(['left', 'right', 'middle']).optional(),
+    count: z.number().int().min(1).optional(),
+    modifiers: z.array(z.enum(['Alt', 'Control', 'Meta', 'Shift'])).optional(),
+    force: z.boolean().optional().describe('Click even if another element covers the target.'),
+    tabId: z.number().int(),
+  },
+  async handler({ ref, button, count, modifiers, force, tabId }, ctx): Promise<ToolResult> {
+    return withElement(ctx, ref, tabId, async (objectId, backendNodeId) => {
+      const info = await inspect(ctx, tabId, objectId);
+      if (info.kind === 'option') {
+        return textResult(`selected ${await selectOption(ctx, tabId, objectId)}`);
+      }
+      const { x, y } = await locate(ctx, tabId, objectId, backendNodeId, { force });
+      const btn: MouseButton = button ?? 'left';
+      await execCdpSeq(
+        ctx,
+        tabId,
+        withModifiers(modifierBits(modifiers ?? []), (m) => clickEvents(x, y, btn, count ?? 1, m)),
+      );
+      return textResult(`clicked ${ref} at (${Math.round(x)}, ${Math.round(y)})`);
     });
-    const { x, y } = boxCenter(box.model.content);
-    await execCdpSeq(ctx, tabId, clickEvents(x, y, 'left', 1));
-    return textResult(`clicked ${ref} at (${x}, ${y})`);
   },
 });
 
-/** Select all content of the focused element (input/textarea/contenteditable), platform-independent. */
-const SELECT_ALL_FOCUSED =
-  '(() => { const el = document.activeElement; if (!el) return false;' +
-  ' if (typeof el.select === "function") el.select();' +
-  ' else if (el.isContentEditable) { const r = document.createRange(); r.selectNodeContents(el);' +
-  ' const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } return true; })()';
+const browser_hover_ref = defineTool({
+  name: 'browser_hover_ref',
+  description: 'Move the real mouse pointer over an element by its [refN] handle (scrolls it into view first), firing pointerover/mouseover/mouseenter — opens hover menus and tooltips.',
+  inputSchema: { ref: z.string(), force: z.boolean().optional(), tabId: z.number().int() },
+  async handler({ ref, force, tabId }, ctx): Promise<ToolResult> {
+    return withElement(ctx, ref, tabId, async (objectId, backendNodeId) => {
+      const { x, y } = await locate(ctx, tabId, objectId, backendNodeId, { force });
+      await execCdp(ctx, tabId, hoverEvent(x, y));
+      return textResult(`hovering ${ref} at (${Math.round(x)}, ${Math.round(y)})`);
+    });
+  },
+});
 
 const browser_fill = defineTool({
   name: 'browser_fill',
-  description: 'Set an element (by its [refN] handle) to a value: focuses it, CLEARS existing content, then types the value via trusted Input events (replaces, does not append). Use browser_type to append at the cursor.',
+  description:
+    'Set a form control (by its [refN] handle) to a value the way a user would, so React/Vue state updates. ' +
+    'Text inputs, textareas and contenteditable editors: clicks into it, selects all (Ctrl/Cmd+A), deletes, then types the value key by key ' +
+    '(keydown/keypress/beforeinput/input/keyup per character; Chinese and other non-keyboard text goes through IME composition events). ' +
+    'Replaces existing content; use browser_type to append. Does not blur — press Tab afterwards if the page validates on blur/change. ' +
+    'Native <select>: value or visible label of the option. Checkbox/radio: "true"/"false" (clicks only if the state differs). ' +
+    'date/time/month/week/color/range inputs: the input\'s value format, e.g. 2024-05-31. File inputs: absolute file path(s), one per line.',
   inputSchema: { ref: z.string(), value: z.string(), tabId: z.number().int() },
   async handler({ ref, value, tabId }, ctx): Promise<ToolResult> {
-    let backendNodeId: number;
-    try {
-      backendNodeId = resolveRef(ctx, ref);
-    } catch (e) {
-      return errorResult((e as Error).message);
-    }
-    await ctx.attach(tabId);
-    await execCdp(ctx, tabId, { method: 'DOM.focus', params: { backendNodeId } });
-    // Clear first so fill REPLACES rather than appends: select all, then a trusted Backspace
-    // (fires real input events React/Vue trackers respect), then type the new value.
-    await execCdp(ctx, tabId, {
-      method: 'Runtime.evaluate',
-      params: { expression: SELECT_ALL_FOCUSED, returnByValue: true },
+    return withElement(ctx, ref, tabId, async (objectId, backendNodeId) => {
+      const info = await inspect(ctx, tabId, objectId);
+      if (info.disabled) return errorResult(`${ref}: element is disabled`);
+
+      switch (info.kind) {
+        case 'select':
+        case 'option':
+          return textResult(`selected ${await selectOption(ctx, tabId, objectId, value)} in ${ref}`);
+
+        case 'toggle': {
+          const v = value.trim().toLowerCase();
+          const want = TRUE_WORDS.includes(v) ? true : FALSE_WORDS.includes(v) ? false : null;
+          if (want === null) return errorResult(`${ref}: a ${info.type} takes "true" or "false", got "${value}"`);
+          if (info.checked !== want) {
+            if (!want && info.type === 'radio') {
+              return errorResult(`${ref}: a radio button cannot be unchecked directly — check another option in its group`);
+            }
+            const { x, y } = await locate(ctx, tabId, objectId, backendNodeId);
+            await execCdpSeq(ctx, tabId, clickEvents(x, y));
+          }
+          const now = (await inspect(ctx, tabId, objectId)).checked;
+          return now === want
+            ? textResult(`${ref} is ${now ? 'checked' : 'unchecked'}`)
+            : errorResult(`${ref}: clicked, but it is still ${now ? 'checked' : 'unchecked'} (the page may have prevented it)`);
+        }
+
+        case 'value':
+          return textResult(`set ${ref} to "${await setNativeValue(ctx, tabId, objectId, value)}"`);
+
+        case 'file': {
+          const files = value.split('\n').map((f) => f.trim()).filter(Boolean);
+          await execCdp(ctx, tabId, { method: 'DOM.setFileInputFiles', params: { files, objectId } });
+          return textResult(`attached ${files.length} file(s) to ${ref}`);
+        }
+
+        default:
+          return fillText(ctx, tabId, ref, objectId, backendNodeId, info.multiline ? value : value.replace(/\r?\n/g, ''));
+      }
     });
-    await execCdpSeq(ctx, tabId, keyEvents('Backspace'));
-    if (value.length > 0) await execCdp(ctx, tabId, insertTextCmd(value));
-    return textResult(`filled ${ref}`);
   },
 });
+
+/** Click into a text control (or a wrapper holding one), clear it, and type `value`. */
+async function fillText(
+  ctx: ToolContext,
+  tabId: number,
+  ref: string,
+  objectId: string,
+  backendNodeId: number,
+  value: string,
+): Promise<ToolResult> {
+  // Click into it like a user (focus, caret, the component's own focus/click
+  // handlers). If something covers it, focus it directly — typing does not need the pointer.
+  try {
+    const { x, y } = await locate(ctx, tabId, objectId, backendNodeId, { timeoutMs: 500 });
+    await execCdpSeq(ctx, tabId, clickEvents(x, y));
+  } catch (e) {
+    if (!(e instanceof ActionError)) throw e;
+  }
+  let state = await focusState(ctx, tabId, objectId);
+  if (!state.focused) {
+    await execCdp(ctx, tabId, { method: 'DOM.focus', params: { objectId } });
+    state = await focusState(ctx, tabId, objectId);
+  }
+  if (!state.editable) return errorResult(`${ref}: element does not accept typed text (click it and use browser_snapshot to find the real input)`);
+  if (state.readOnly) return errorResult(`${ref}: input is read-only (pickers often are — click it and choose from the popup instead)`);
+
+  if (state.value !== '') {
+    await execCdpSeq(ctx, tabId, [...keyEvents('Control+A'), ...keyEvents('Backspace')]);
+  }
+  if (value.length > TYPE_LIMIT) await execCdp(ctx, tabId, insertTextCmd(value));
+  else await execCdpSeq(ctx, tabId, typeEvents(value));
+
+  // innerText of a contenteditable ends with the block's trailing newline.
+  const after = (await focusState(ctx, tabId, objectId)).value.replace(/\n$/, '');
+  const shown = after.length > 200 ? `${after.slice(0, 200)}…` : after;
+  return after === value
+    ? textResult(`filled ${ref}`)
+    : textResult(`filled ${ref}; the field now shows "${shown}" (formatted, masked or length-limited by the page)`);
+}
 
 const browser_query = defineTool({
   name: 'browser_query',
@@ -160,6 +274,7 @@ const browser_eval = defineTool({
 export const domTools: ToolDef[] = [
   browser_snapshot,
   browser_click_ref,
+  browser_hover_ref,
   browser_fill,
   browser_query,
   browser_get_text,
