@@ -9,7 +9,7 @@ This repository distributes the Browpilot companion, extension packages, setup i
 Requires Node.js 20 or newer.
 
 ```sh
-npm install -g https://github.com/michael-ltm/browpilot/releases/download/v0.2.2/john523100-browpilot-0.2.2.tgz
+npm install -g https://github.com/michael-ltm/browpilot/releases/download/v0.2.3/john523100-browpilot-0.2.3.tgz
 browpilot install codex
 # Or: browpilot install claude
 ```
@@ -18,7 +18,7 @@ Restart your MCP client after registration. If its CLI is unavailable, use `brow
 
 ## Install and connect the extension
 
-Install Browpilot from the [Chrome Web Store](https://chromewebstore.google.com/detail/kglhakgapoegbnnbobnmnebmbljehcid). Version 0.2.1 is published there; 0.2.2 was submitted on October 25, 2026 (UTC) and is pending review with automatic publication after approval. For Edge or an unpacked copy, run `browpilot extension-path` and load that directory using Developer mode → Load unpacked at `chrome://extensions` or `edge://extensions`.
+Install Browpilot from the [Chrome Web Store](https://chromewebstore.google.com/detail/kglhakgapoegbnnbobnmnebmbljehcid). Version 0.2.2 is published there; 0.2.3 is being submitted for review with automatic publication after approval. For Edge or an unpacked copy, run `browpilot extension-path` and load that directory using Developer mode → Load unpacked at `chrome://extensions` or `edge://extensions`.
 
 1. Ask your AI client to call `browser_list_instances`.
 2. Choose an exact local instance ID and call `browser_open_instance`.
@@ -49,7 +49,7 @@ Daily default directories are refused by developer launch. Normal profile startu
 
 ## Store status
 
-Chrome: version 0.2.1 is published at https://chromewebstore.google.com/detail/kglhakgapoegbnnbobnmnebmbljehcid. Version 0.2.2 (same permissions) is pending review with automatic publication after approval.
+Chrome: version 0.2.2 is published at https://chromewebstore.google.com/detail/kglhakgapoegbnnbobnmnebmbljehcid. Version 0.2.3 adds the `management` permission for the `browser_extensions` tool (see [permission audit](PERMISSIONS.md)); it is being submitted for review with automatic publication after approval. Chrome asks existing users to approve the new permission after the update.
 
 Edge: a submission ZIP is available in the release; no Edge store approval or publication is claimed.
 
@@ -57,7 +57,7 @@ See [review setup instructions](TESTING.md) for a direct MCP test without an AI 
 
 ## Validation and privacy
 
-Version 0.2.2 passed 442 automated tests, workspace type checks and builds. Real Linux Chromium verified offline installation evidence, cold startup/pairing, MCP tab control, automatic restart and evaluation in a second independent extension worker. Windows/macOS and actual Edge have not received equivalent live testing.
+Version 0.2.3 passed 469 automated tests and workspace type checks on Linux (Windows CI still has known path-specific failures in developer-launch and local-discovery tests). Its real-input changes were verified in Chrome against React 18 and Vue 3 forms. Version 0.2.2 passed 442 automated tests, workspace type checks and builds. Real Linux Chromium verified offline installation evidence, cold startup/pairing, MCP tab control, automatic restart and evaluation in a second independent extension worker. Windows/macOS and actual Edge have not received equivalent live testing.
 
 See [Privacy policy](privacy.md). Tool results reach the MCP client and its AI provider; remote access also uses the tunnel/proxy you configure. No built-in analytics or hosted collection service is included.
 

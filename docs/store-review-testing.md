@@ -20,7 +20,8 @@ Browpilot connects a user-selected local Chrome profile to MCP tools. The extens
 2. Call `browser_open_instance` with `{"id":"<exact id returned above>","timeoutMs":60000}`. This opens the selected browser if needed and opens a local pairing tab. Allow that tab to complete pairing. The popup should show the connected companion.
 3. Call `browser_get_tabs` with `{}`. The returned list should contain the selected profile's actual open tabs.
 4. Open a harmless page such as `https://example.com` in that profile. Use the MCP client's displayed tool schema to call `browser_snapshot` for that page, then take a screenshot or inspect its text. Chrome displays its standard debugger notice while debugging is attached.
-5. Close that test profile normally, then repeat a read call from the same selected MCP session. Browpilot can reopen an identified local profile and reconnect. Refresh tab IDs and snapshots after restarting.
+5. Call `browser_extensions` with `{"action":"list"}`. It returns the installed extensions of the selected profile (this is the only use of the `management` permission added in 0.2.3; `reload`, `enable`, `disable` and `open_options` act only on an extension id you pass).
+6. Close that test profile normally, then repeat a read call from the same selected MCP session. Browpilot can reopen an identified local profile and reconnect. Refresh tab IDs and snapshots after restarting.
 
 For a nonstandard browser installation, `browser_register_instance` accepts its browser type, executable, user-data directory and profile directory. No browser credentials should be sent to us.
 
