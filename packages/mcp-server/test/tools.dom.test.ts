@@ -67,17 +67,63 @@ describe('dom tools', () => {
     expect(res.content[0]).toMatchObject({ type: 'text' });
   });
 
-  it('browser_click_ref resolves the ref via DOM.getBoxModel and clicks the box center', async () => {
+  /** Fake page: ref nodes resolve to handles; page functions answer by what they are. */
+  function fakePage(opts: {
+    info?: Record<string, unknown>;
+    focus?: Array<Record<string, unknown>>;
+    hit?: number;
+    blocker?: string | null;
+  } = {}) {
+    const info = { kind: 'text', tag: 'input', type: 'text', multiline: false, readOnly: false, disabled: false, checked: false, ...opts.info };
+    const focus = [...(opts.focus ?? [{ focused: true, editable: true, readOnly: false, value: '' }])];
+    client.onCdp('DOM.resolveNode', (p: Record<string, unknown>) => ({ object: { objectId: `obj-${p.backendNodeId}` } }));
+    client.onCdp('DOM.getContentQuads', { quads: [[10, 20, 110, 20, 110, 60, 10, 60]] });
+    client.onCdp('DOM.getNodeForLocation', { backendNodeId: opts.hit ?? 100 });
+    client.onCdp('Runtime.callFunctionOn', (p: Record<string, unknown>) => {
+      const fn = String(p.functionDeclaration);
+      if (fn.includes('scrollIntoView')) return { result: { objectId: 'target' } };
+      if (fn.includes("kind = 'other'")) return { result: { value: info } };
+      if (fn.includes('activeElement')) return { result: { value: focus.length > 1 ? focus.shift() : focus[0] } };
+      if (fn.includes('owners')) return { result: { value: opts.blocker ?? null } };
+      if (fn.includes('sel.options')) return { result: { value: 'Shanghai (value "sh")' } };
+      return { result: {} };
+    });
+  }
+
+  it('browser_click_ref scrolls into view, hit-tests, and clicks the content-quad center', async () => {
     ctx.refs.set('ref1', 100);
-    client.onCdp('DOM.getBoxModel', { model: { content: [10, 20, 110, 20, 110, 60, 10, 60] } });
-    await tool('browser_click_ref').handler({ ref: 'ref1', tabId: 5 }, ctx);
+    fakePage();
+    const res = await tool('browser_click_ref').handler({ ref: 'ref1', tabId: 5 }, ctx);
+    expect(res.isError).toBeFalsy();
     const cdp = client.cdpCalls();
-    // getBoxModel is called with the backendNodeId
-    const box = cdp.find((c) => c.method === 'DOM.getBoxModel');
-    expect(box?.params).toMatchObject({ backendNodeId: 100 });
-    // then a click sequence at the center (60,40)
-    const press = cdp.find((c) => c.params?.type === 'mousePressed');
-    expect(press?.params).toMatchObject({ x: 60, y: 40, button: 'left' });
+    expect(cdp.find((c) => c.method === 'DOM.resolveNode')?.params).toMatchObject({ backendNodeId: 100 });
+    expect(cdp.some((c) => c.method === 'Runtime.callFunctionOn' && /scrollIntoView/.test(String(c.params?.functionDeclaration)))).toBe(true);
+    expect(cdp.find((c) => c.method === 'DOM.getNodeForLocation')?.params).toMatchObject({ x: 60, y: 40 });
+    const mouse = cdp.filter((c) => c.method === 'Input.dispatchMouseEvent');
+    expect(mouse.map((c) => c.params?.type)).toEqual(['mouseMoved', 'mousePressed', 'mouseReleased']);
+    expect(mouse[1]?.params).toMatchObject({ x: 60, y: 40, button: 'left' });
+  });
+
+  it('browser_click_ref refuses to click through an overlay unless forced', async () => {
+    ctx.refs.set('ref1', 100);
+    fakePage({ hit: 999, blocker: '<div.modal-mask>' });
+    const res = await tool('browser_click_ref').handler({ ref: 'ref1', tabId: 5 }, ctx);
+    expect(res.isError).toBe(true);
+    expect((res.content[0] as { text: string }).text).toMatch(/covered by <div\.modal-mask>/);
+    expect(client.cdpCalls().some((c) => c.method === 'Input.dispatchMouseEvent')).toBe(false);
+
+    const forced = await tool('browser_click_ref').handler({ ref: 'ref1', force: true, tabId: 5 }, ctx);
+    expect(forced.isError).toBeFalsy();
+    expect(client.cdpCalls().some((c) => c.params?.type === 'mousePressed')).toBe(true);
+  }, 10_000);
+
+  it('browser_click_ref holds modifiers around the click', async () => {
+    ctx.refs.set('ref1', 100);
+    fakePage();
+    await tool('browser_click_ref').handler({ ref: 'ref1', modifiers: ['Control'], tabId: 5 }, ctx);
+    const input = client.cdpCalls().filter((c) => c.method.startsWith('Input.'));
+    expect(input.map((c) => `${c.params?.type}`)).toEqual(['rawKeyDown', 'mouseMoved', 'mousePressed', 'mouseReleased', 'keyUp']);
+    expect(input[2]?.params).toMatchObject({ modifiers: 2 });
   });
 
   it('browser_click_ref errors with a stale-ref message when ref is unknown', async () => {
@@ -87,16 +133,66 @@ describe('dom tools', () => {
     expect((res.content[0] as { text: string }).text).toMatch(/stale|unknown ref/i);
   });
 
-  it('browser_fill resolves the ref, focuses it, and inserts text', async () => {
+  it('browser_fill clicks in, selects all + Backspace when non-empty, then types key by key', async () => {
     ctx.refs.set('ref2', 200);
-    client.onCdp('DOM.getBoxModel', { model: { content: [0, 0, 50, 0, 50, 20, 0, 20] } });
-    await tool('browser_fill').handler({ ref: 'ref2', value: 'a@b.com', tabId: 5 }, ctx);
-    const cdp = client.cdpCalls();
-    expect(cdp.some((c) => c.method === 'DOM.focus' && c.params?.backendNodeId === 200)).toBe(true);
-    // clears existing content first (select-all + trusted Backspace) so fill REPLACES, not appends
-    expect(cdp.some((c) => c.method === 'Runtime.evaluate' && /el\.select|selectNodeContents/.test(String(c.params?.expression)))).toBe(true);
-    expect(cdp.some((c) => c.method === 'Input.dispatchKeyEvent' && c.params?.key === 'Backspace')).toBe(true);
-    expect(cdp.some((c) => c.method === 'Input.insertText' && c.params?.text === 'a@b.com')).toBe(true);
+    fakePage({
+      hit: 200,
+      focus: [
+        { focused: true, editable: true, readOnly: false, value: 'old' },
+        { focused: true, editable: true, readOnly: false, value: 'a@b' },
+      ],
+    });
+    const res = await tool('browser_fill').handler({ ref: 'ref2', value: 'a@b', tabId: 5 }, ctx);
+    expect(res.isError).toBeFalsy();
+    expect((res.content[0] as { text: string }).text).toBe('filled ref2');
+    const input = client.cdpCalls().filter((c) => c.method.startsWith('Input.'));
+    expect(input.slice(0, 3).map((c) => c.params?.type)).toEqual(['mouseMoved', 'mousePressed', 'mouseReleased']);
+    const keys = input.filter((c) => c.method === 'Input.dispatchKeyEvent').map((c) => `${c.params?.type}:${c.params?.key}`);
+    expect(keys).toEqual([
+      'rawKeyDown:Control', 'rawKeyDown:a', 'keyUp:a', 'keyUp:Control',
+      'rawKeyDown:Backspace', 'keyUp:Backspace',
+      'keyDown:a', 'keyUp:a', 'rawKeyDown:Shift', 'keyDown:@', 'keyUp:@', 'keyUp:Shift', 'keyDown:b', 'keyUp:b',
+    ]);
+    expect(input.find((c) => c.params?.key === 'a' && c.params?.modifiers === 2)?.params?.commands).toEqual(['selectAll']);
+  });
+
+  it('browser_fill skips clearing an empty field and reports a reformatted value', async () => {
+    ctx.refs.set('ref2', 200);
+    fakePage({
+      hit: 200,
+      focus: [
+        { focused: true, editable: true, readOnly: false, value: '' },
+        { focused: true, editable: true, readOnly: false, value: '123-4' },
+      ],
+    });
+    const res = await tool('browser_fill').handler({ ref: 'ref2', value: '1234', tabId: 5 }, ctx);
+    expect(client.cdpCalls().some((c) => c.params?.key === 'Backspace')).toBe(false);
+    expect((res.content[0] as { text: string }).text).toMatch(/now shows "123-4"/);
+  });
+
+  it('browser_fill refuses read-only inputs without typing', async () => {
+    ctx.refs.set('ref2', 200);
+    fakePage({ hit: 200, focus: [{ focused: true, editable: true, readOnly: true, value: '' }] });
+    const res = await tool('browser_fill').handler({ ref: 'ref2', value: 'x', tabId: 5 }, ctx);
+    expect(res.isError).toBe(true);
+    expect(client.cdpCalls().some((c) => c.method === 'Input.dispatchKeyEvent')).toBe(false);
+  });
+
+  it('browser_fill picks an option of a native select without key events', async () => {
+    ctx.refs.set('ref3', 300);
+    fakePage({ info: { kind: 'select', tag: 'select' } });
+    const res = await tool('browser_fill').handler({ ref: 'ref3', value: 'Shanghai', tabId: 5 }, ctx);
+    expect((res.content[0] as { text: string }).text).toBe('selected Shanghai (value "sh") in ref3');
+    const call = client.cdpCalls().find((c) => /sel\.options/.test(String(c.params?.functionDeclaration)));
+    expect(call?.params?.arguments).toEqual([{ value: 'Shanghai' }]);
+  });
+
+  it('browser_fill clicks a checkbox only when its state differs', async () => {
+    ctx.refs.set('ref4', 400);
+    fakePage({ info: { kind: 'toggle', tag: 'input', type: 'checkbox', checked: true } });
+    const res = await tool('browser_fill').handler({ ref: 'ref4', value: 'true', tabId: 5 }, ctx);
+    expect((res.content[0] as { text: string }).text).toBe('ref4 is checked');
+    expect(client.cdpCalls().some((c) => c.method === 'Input.dispatchMouseEvent')).toBe(false);
   });
 
   it('browser_query runs Runtime.evaluate with a querySelector expression', async () => {

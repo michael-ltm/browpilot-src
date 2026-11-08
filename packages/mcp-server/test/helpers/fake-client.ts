@@ -9,12 +9,13 @@ export interface RecordedRequest {
 /** Records requests and replays queued/keyed responses. No network. */
 export class FakeClient implements RpcLike {
   readonly calls: RecordedRequest[] = [];
-  /** Per-CDP-method canned results for EXECUTE_CDP, keyed by inner cdp method. */
+  /** Per-CDP-method canned results for EXECUTE_CDP, keyed by inner cdp method.
+   *  A function is called with the inner CDP params to compute each result. */
   private cdpResults = new Map<string, unknown>();
   /** Per-top-level-method canned results (e.g. GET_TABS). */
   private methodResults = new Map<string, unknown>();
 
-  onCdp(cdpMethod: string, result: unknown): this {
+  onCdp(cdpMethod: string, result: unknown | ((params: Record<string, unknown>) => unknown)): this {
     this.cdpResults.set(cdpMethod, result);
     return this;
   }
@@ -25,9 +26,10 @@ export class FakeClient implements RpcLike {
 
   request<R = unknown>(method: string, params?: unknown, timeoutMs?: number): Promise<R> {
     this.calls.push({ method, params, timeoutMs });
-    const p = params as { method?: string } | undefined;
+    const p = params as { method?: string; params?: Record<string, unknown> } | undefined;
     if (p && typeof p.method === 'string' && this.cdpResults.has(p.method)) {
-      return Promise.resolve(this.cdpResults.get(p.method) as R);
+      const result = this.cdpResults.get(p.method);
+      return Promise.resolve((typeof result === 'function' ? result(p.params ?? {}) : result) as R);
     }
     if (this.methodResults.has(method)) {
       return Promise.resolve(this.methodResults.get(method) as R);
