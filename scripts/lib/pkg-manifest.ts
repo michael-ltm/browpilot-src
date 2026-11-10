@@ -23,6 +23,6 @@ export function makePackageManifest(version: string, dependencies: Record<string
     dependencies,
     engines: { node: '>=20' },
     repository: { type: 'git', url: 'https://github.com/michael-ltm/browpilot-src' },
-    license: 'MIT',
+    license: 'Apache-2.0',
   };
 }

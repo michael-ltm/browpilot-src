@@ -125,4 +125,4 @@ For an isolated real Chromium test, run `node --import tsx scripts/smoke-browser
 
 The extension uses `chrome.debugger`, so browsers can display their debugging indicator. Alarms and heartbeats reconnect suspended service workers; OS sleep, disabled extensions and browser shutdown can still interrupt calls. The Node companion starts browsers, not the extension.
 
-MIT licensed. [Source and issue tracking](https://github.com/michael-ltm/browpilot-src).
+Licensed under [Apache-2.0](LICENSE). [Source and issue tracking](https://github.com/michael-ltm/browpilot-src).
